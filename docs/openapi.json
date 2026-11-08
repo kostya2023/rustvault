@@ -1,0 +1,2697 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RustVault API",
+    "description": "HTTP API for RustVault account, authentication, security settings, and encrypted vault storage. Binary vault contents remain client-side encrypted.",
+    "license": {
+      "name": ""
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current server"
+    }
+  ],
+  "paths": {
+    "/v1/account": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get current account information",
+        "operationId": "get_account_info",
+        "responses": {
+          "200": {
+            "description": "Current account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/delete/with-passkey/step1": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Begin account deletion using a passkey",
+        "description": "Returns WebAuthn assertion options. Complete the challenge using DELETE step 2.",
+        "operationId": "delete_account_with_passkey_step1",
+        "responses": {
+          "200": {
+            "description": "Passkey assertion options and operation ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallengeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No passkey found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/delete/with-passkey/step2": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Confirm account deletion using a passkey",
+        "operationId": "delete_account_with_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePasskeyConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Account, related records, and vault deleted"
+          },
+          "401": {
+            "description": "Access token or passkey assertion rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Confirmation operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or object-storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/delete/with-passtotp/step1": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Begin account deletion using password and TOTP",
+        "operationId": "delete_account_with_passtotp_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePasswordStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password challenge and operation ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePasswordStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed password request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/delete/with-passtotp/step2": {
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Confirm account deletion using password and TOTP",
+        "operationId": "delete_account_with_passtotp_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePasswordTotpConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Account, related records, and vault deleted"
+          },
+          "401": {
+            "description": "Password, TOTP, or access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Confirmation operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or object-storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/auth/login/with-passkey/step1": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin passkey login",
+        "operationId": "auth_login_with_passkey_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginPasskeyStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "WebAuthn request options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginPasskeyStep1Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No passkeys found for account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login/with-passkey/step2": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete passkey login",
+        "operationId": "auth_login_with_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginPasskeyStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Passkey assertion rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Login operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login/with-passtotp/step1": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin password and TOTP login",
+        "operationId": "auth_login_with_passtotp_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginPasswordStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OPAQUE challenge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginPasswordStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed login request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account or password credential not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login/with-passtotp/step2": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete password and TOTP login",
+        "operationId": "auth_login_with_passtotp_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginPasswordStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed password upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid password or TOTP code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Login operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "delete": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Log out and revoke the current token pair",
+        "operationId": "auth_logout",
+        "responses": {
+          "204": {
+            "description": "Token pair revoked"
+          },
+          "401": {
+            "description": "Missing, expired, or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Rotate access and refresh tokens",
+        "description": "Requires the current refresh token in the Bearer authorization header. The old token pair is revoked.",
+        "operationId": "auth_refresh_tokens",
+        "responses": {
+          "200": {
+            "description": "New token pair",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, or revoked refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/auth/register/with-passtotp/step1": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Begin password and TOTP registration",
+        "operationId": "auth_register_with_passtotp_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password challenge and TOTP provisioning URI",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed registration request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/register/with-passtotp/step2": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete password and TOTP registration",
+        "operationId": "auth_register_with_passtotp_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Account created and token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid password upload or TOTP code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Registration operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/blob": {
+      "get": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Download encrypted vault",
+        "description": "Returns the exact binary vault payload as `application/octet-stream`. The payload is client-side encrypted.",
+        "operationId": "get_blob",
+        "responses": {
+          "200": {
+            "description": "Encrypted vault bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/BinaryBlob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Object-storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Upload or replace encrypted vault",
+        "description": "Sends the raw binary encrypted vault, not JSON. Version must strictly exceed the stored version. Maximum body size is configured by the server.",
+        "operationId": "upload_blob",
+        "parameters": [
+          {
+            "name": "X-Blob-Version",
+            "in": "header",
+            "description": "New monotonically increasing vault version",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 2
+          }
+        ],
+        "requestBody": {
+          "description": "Raw encrypted vault bytes",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/BinaryBlob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Vault and metadata stored"
+          },
+          "400": {
+            "description": "Missing or invalid X-Blob-Version header",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload exceeds configured maximum body size",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Version is not greater than the stored version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or object-storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/blob/meta": {
+      "get": {
+        "tags": [
+          "Vault"
+        ],
+        "summary": "Get encrypted vault metadata",
+        "operationId": "get_meta",
+        "responses": {
+          "200": {
+            "description": "Metadata for the authenticated user's vault",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlobMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vault metadata not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/healthz": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Check service liveness",
+        "description": "Returns a small status document when the HTTP service is responding.",
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/security/changes/change-password/with-passkey/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin password change with passkey confirmation",
+        "operationId": "change_password_with_passkey_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordPasskeyStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey assertion options and new-password challenge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordPasskeyStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed OPAQUE registration request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-password/with-passkey/step2": {
+      "put": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Confirm password change with passkey",
+        "operationId": "change_password_with_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordPasskeyStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed"
+          },
+          "400": {
+            "description": "Malformed OPAQUE or WebAuthn response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token or passkey assertion rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or cache error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-password/with-totp/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin password change with current password and TOTP",
+        "operationId": "change_password_with_totp_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordTotpStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Current-password and new-password OPAQUE challenges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePasswordTotpStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed OPAQUE request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-password/with-totp/step2": {
+      "put": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Confirm password change with current password and TOTP",
+        "operationId": "change_password_with_totp_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordTotpStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed"
+          },
+          "400": {
+            "description": "Malformed OPAQUE response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Password, TOTP, or access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or cache error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-totp/with-passkey/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin TOTP replacement with passkey confirmation",
+        "operationId": "change_totp_with_passkey_step1",
+        "responses": {
+          "200": {
+            "description": "Passkey options and new TOTP provisioning URI",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeTotpPasskeyStep1Response"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No registered passkey found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-totp/with-passkey/step2": {
+      "put": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Confirm TOTP replacement with passkey",
+        "operationId": "change_totp_with_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTotpPasskeyStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "TOTP secret replaced"
+          },
+          "400": {
+            "description": "Malformed WebAuthn response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token, passkey assertion, or TOTP code rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or cache error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-totp/with-password/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin TOTP replacement with current password",
+        "operationId": "change_totp_with_password_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTotpPasswordStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Password challenge and new TOTP provisioning URI",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeTotpPasswordStep1Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed password request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/changes/change-totp/with-password/step2": {
+      "put": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Confirm TOTP replacement with current password",
+        "operationId": "change_totp_with_password_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTotpPasswordStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "TOTP secret replaced"
+          },
+          "400": {
+            "description": "Malformed password response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Password, TOTP code, or access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or cache error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/events": {
+      "get": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "List current account security events",
+        "description": "Events are returned newest-first. The endpoint only returns events belonging to the authenticated user.",
+        "operationId": "get_security_events",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100; defaults to 50",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of newest events to skip; defaults to 0",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of security events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityEventsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit or offset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/manage-passkeys/add/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin passkey registration",
+        "operationId": "add_passkey_step1",
+        "responses": {
+          "200": {
+            "description": "WebAuthn registration options and operation ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyChallengeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or WebAuthn error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/manage-passkeys/add/step2": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Complete passkey registration",
+        "operationId": "add_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPasskeyStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Passkey registered"
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Registration operation expired or credential was rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or WebAuthn error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/manage-passkeys/delete/step1": {
+      "post": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Begin passkey deletion",
+        "operationId": "delete_passkey_step1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePasskeyStep1Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "WebAuthn assertion options and operation ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePasskeyStep1Response"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No passkey found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or WebAuthn error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/manage-passkeys/delete/step2": {
+      "delete": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "Confirm passkey deletion",
+        "operationId": "delete_passkey_step2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePasskeyStep2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Passkey deleted"
+          },
+          "400": {
+            "description": "Credential ID is not a valid hex string",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token or passkey assertion rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Passkey not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Confirmation operation expired or was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database or WebAuthn error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/v1/security/passkeys": {
+      "get": {
+        "tags": [
+          "Security"
+        ],
+        "summary": "List current account passkeys",
+        "operationId": "get_passkeys",
+        "responses": {
+          "200": {
+            "description": "Registered passkeys ordered by creation time",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PasskeyInfo"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, or revoked access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountResponse": {
+        "type": "object",
+        "required": [
+          "username",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Account creation time in RFC 3339 format."
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "AddPasskeyStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "keyname",
+          "passkey_props"
+        ],
+        "properties": {
+          "keyname": {
+            "type": "string",
+            "description": "User-facing label for this passkey."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn `PublicKeyCredential` registration response."
+          }
+        }
+      },
+      "BinaryBlob": {
+        "type": "string",
+        "format": "binary"
+      },
+      "BlobMetadata": {
+        "type": "object",
+        "required": [
+          "hash_blake3",
+          "version",
+          "size",
+          "updated_at"
+        ],
+        "properties": {
+          "hash_blake3": {
+            "type": "string",
+            "description": "BLAKE3 digest of the encrypted blob, encoded as lowercase hexadecimal."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Blob length in bytes."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update time in RFC 3339 format."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChangePasswordPasskeyStep1Request": {
+        "type": "object",
+        "required": [
+          "new_password_request"
+        ],
+        "properties": {
+          "new_password_request": {
+            "type": "string",
+            "description": "OPAQUE registration request for the new password, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "ChangePasswordPasskeyStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "passkey_props",
+          "new_password_response"
+        ],
+        "properties": {
+          "new_password_response": {
+            "type": "string",
+            "description": "OPAQUE registration response for the new password, Base64 URL-safe encoded without padding."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion options for proving possession of a registered passkey."
+          }
+        }
+      },
+      "ChangePasswordPasskeyStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "passkey_props",
+          "new_password_upload"
+        ],
+        "properties": {
+          "new_password_upload": {
+            "type": "string",
+            "description": "OPAQUE registration upload for the new password, Base64 URL-safe encoded without padding."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion from step 1."
+          }
+        }
+      },
+      "ChangePasswordTotpStep1Request": {
+        "type": "object",
+        "required": [
+          "current_password_request",
+          "new_password_request"
+        ],
+        "properties": {
+          "current_password_request": {
+            "type": "string",
+            "description": "OPAQUE login request proving the current password, Base64 URL-safe encoded without padding."
+          },
+          "new_password_request": {
+            "type": "string",
+            "description": "OPAQUE registration request for the new password, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "ChangePasswordTotpStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "current_password_response",
+          "new_password_response"
+        ],
+        "properties": {
+          "current_password_response": {
+            "type": "string",
+            "description": "OPAQUE login response for the current password, Base64 URL-safe encoded without padding."
+          },
+          "new_password_response": {
+            "type": "string",
+            "description": "OPAQUE registration response for the new password, Base64 URL-safe encoded without padding."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ChangePasswordTotpStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "current_password_upload",
+          "new_password_upload",
+          "totp_code"
+        ],
+        "properties": {
+          "current_password_upload": {
+            "type": "string",
+            "description": "OPAQUE login finalization for the current password, Base64 URL-safe encoded without padding."
+          },
+          "new_password_upload": {
+            "type": "string",
+            "description": "OPAQUE registration upload for the new password, Base64 URL-safe encoded without padding."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totp_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ChangeTotpPasskeyStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "passkey_props",
+          "totp_url"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion options for the registered passkey."
+          },
+          "totp_url": {
+            "type": "string",
+            "description": "New TOTP provisioning URI. Store it in an authenticator before step 2."
+          }
+        }
+      },
+      "ChangeTotpPasskeyStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "passkey_props",
+          "totp_code"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion response from step 1."
+          },
+          "totp_code": {
+            "type": "string",
+            "description": "Current code for the newly provisioned TOTP secret."
+          }
+        }
+      },
+      "ChangeTotpPasswordStep1Request": {
+        "type": "object",
+        "required": [
+          "password_request"
+        ],
+        "properties": {
+          "password_request": {
+            "type": "string",
+            "description": "OPAQUE login request for the current password, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "ChangeTotpPasswordStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "password_response",
+          "totp_url"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "password_response": {
+            "type": "string"
+          },
+          "totp_url": {
+            "type": "string",
+            "description": "New TOTP provisioning URI. Store it in an authenticator before step 2."
+          }
+        }
+      },
+      "ChangeTotpPasswordStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "password_upload",
+          "totp_code"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "password_upload": {
+            "type": "string",
+            "description": "OPAQUE login finalization for the current password, Base64 URL-safe encoded without padding."
+          },
+          "totp_code": {
+            "type": "string"
+          }
+        }
+      },
+      "DeletePasskeyConfirmation": {
+        "type": "object",
+        "required": [
+          "passkey_props",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion returned by the browser."
+          }
+        }
+      },
+      "DeletePasskeyStep1Request": {
+        "type": "object",
+        "required": [
+          "credential_id"
+        ],
+        "properties": {
+          "credential_id": {
+            "type": "string",
+            "description": "Credential ID from `GET /v1/security/passkeys` (hex encoded)."
+          }
+        }
+      },
+      "DeletePasskeyStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "credential_id",
+          "passkey_props"
+        ],
+        "properties": {
+          "credential_id": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn authentication request options."
+          }
+        }
+      },
+      "DeletePasskeyStep2Request": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "credential_id",
+          "passkey_props"
+        ],
+        "properties": {
+          "credential_id": {
+            "type": "string",
+            "description": "Credential ID from the step 1 response."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn `PublicKeyCredential` assertion response."
+          }
+        }
+      },
+      "DeletePasswordStep1Request": {
+        "type": "object",
+        "required": [
+          "password_request"
+        ],
+        "properties": {
+          "password_request": {
+            "type": "string",
+            "description": "OPAQUE login request proving the current password, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "DeletePasswordStep1Response": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "password_response"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "password_response": {
+            "type": "string",
+            "description": "OPAQUE credential response, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "DeletePasswordTotpConfirmation": {
+        "type": "object",
+        "required": [
+          "password_upload",
+          "totp_code",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "password_upload": {
+            "type": "string",
+            "description": "OPAQUE credential finalization, Base64 URL-safe encoded without padding."
+          },
+          "totp_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "error",
+          "trace_id"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail",
+            "description": "Stable error code and generic client-facing text."
+          },
+          "trace_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Request correlation ID. Include it when contacting support."
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "text"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code."
+          },
+          "text": {
+            "type": "string",
+            "description": "Generic, safe-to-display message."
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Liveness status."
+          }
+        }
+      },
+      "LoginPasskeyStep1Request": {
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username whose registered passkeys should be challenged."
+          }
+        }
+      },
+      "LoginPasskeyStep1Response": {
+        "type": "object",
+        "required": [
+          "passkey_props",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn authentication request options to pass to the browser WebAuthn API."
+          }
+        }
+      },
+      "LoginPasskeyStep2Request": {
+        "type": "object",
+        "required": [
+          "passkey_props",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn `PublicKeyCredential` assertion returned by the browser."
+          }
+        }
+      },
+      "LoginPasswordStep1Request": {
+        "type": "object",
+        "required": [
+          "username",
+          "password_request"
+        ],
+        "properties": {
+          "password_request": {
+            "type": "string",
+            "description": "OPAQUE credential request, Base64 URL-safe encoded without padding."
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginPasswordStep1Response": {
+        "type": "object",
+        "required": [
+          "password_response",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Login operation identifier, valid for five minutes."
+          },
+          "password_response": {
+            "type": "string",
+            "description": "OPAQUE credential response, Base64 URL-safe encoded without padding."
+          }
+        }
+      },
+      "LoginPasswordStep2Request": {
+        "type": "object",
+        "required": [
+          "password_upload",
+          "totp_code",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Operation identifier from password login step 1."
+          },
+          "password_upload": {
+            "type": "string",
+            "description": "OPAQUE credential finalization, Base64 URL-safe encoded without padding."
+          },
+          "totp_code": {
+            "type": "string",
+            "description": "Current authenticator code."
+          }
+        }
+      },
+      "PasskeyChallengeResponse": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "passkey_props"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passkey_props": {
+            "description": "WebAuthn assertion options for the registered passkey."
+          }
+        }
+      },
+      "PasskeyInfo": {
+        "type": "object",
+        "required": [
+          "credential_id",
+          "keyname",
+          "created_at",
+          "last_used_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "credential_id": {
+            "type": "string",
+            "description": "Credential ID encoded as lowercase hexadecimal."
+          },
+          "keyname": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RegisterStep1Request": {
+        "type": "object",
+        "required": [
+          "username",
+          "password_request"
+        ],
+        "properties": {
+          "password_request": {
+            "type": "string",
+            "description": "OPAQUE registration request, Base64 URL-safe encoded without padding."
+          },
+          "username": {
+            "type": "string",
+            "description": "Account name to register."
+          }
+        }
+      },
+      "RegisterStep1Response": {
+        "type": "object",
+        "required": [
+          "password_response",
+          "totp_url",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Registration operation identifier, valid for five minutes."
+          },
+          "password_response": {
+            "type": "string",
+            "description": "OPAQUE registration response, Base64 URL-safe encoded without padding."
+          },
+          "totp_url": {
+            "type": "string",
+            "description": "TOTP provisioning URI. Treat as a secret until registration completes."
+          }
+        }
+      },
+      "RegisterStep2Request": {
+        "type": "object",
+        "required": [
+          "username",
+          "password_upload",
+          "totp_code",
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Operation identifier returned from registration step 1."
+          },
+          "password_upload": {
+            "type": "string",
+            "description": "OPAQUE registration upload, Base64 URL-safe encoded without padding."
+          },
+          "totp_code": {
+            "type": "string",
+            "description": "Current TOTP code generated by the authenticator for the provisioned URI."
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityEvent": {
+        "type": "object",
+        "required": [
+          "username",
+          "id",
+          "event_type",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event time in RFC 3339 format."
+          },
+          "event_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityEventsResponse": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityEvent"
+            }
+          }
+        }
+      },
+      "TokenPairResponse": {
+        "type": "object",
+        "required": [
+          "username",
+          "access_token",
+          "refresh_token",
+          "access_token_ttl",
+          "refresh_token_ttl"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Access token. Send as `Authorization: Bearer <access_token>`."
+          },
+          "access_token_ttl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Access token lifetime in seconds.",
+            "minimum": 0
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token. Send to `/v1/auth/refresh` as a Bearer token."
+          },
+          "refresh_token_ttl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Refresh token lifetime in seconds.",
+            "minimum": 0
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer_auth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service liveness"
+    },
+    {
+      "name": "Authentication",
+      "description": "Registration, sign-in, token rotation, and logout"
+    },
+    {
+      "name": "Account",
+      "description": "Current account operations"
+    },
+    {
+      "name": "Security",
+      "description": "Account security settings, passkeys, and audit events"
+    },
+    {
+      "name": "Vault",
+      "description": "Encrypted vault data and metadata"
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      RUST_BACKTRACE: "full"
+    secrets:
+      - source: rustvault_env
+        target: rustvault.env
+        mode: 0400
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/v1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - backend_net
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rustvault
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rustvault"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
+    networks:
+      - backend_net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - redis
+    environment:
+      REDISCLI_AUTH: redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+    networks:
+      - backend_net
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: unless-stopped
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_CREATE_BUCKET: rustvault
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+    networks:
+      - backend_net
+
+  nginx:
+    image: owasp/modsecurity-crs:nginx
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+      - "443:8443"
+    environment:
+      SERVER_NAME: rustvault.ru
+      PORT: 8080
+      SSL_PORT: 8443
+
+      # CRS paranoia level
+      BLOCKING_PARANOIA: 2
+      DETECTION_PARANOIA: 2
+      ANOMALY_INBOUND: 5
+      ANOMALY_OUTBOUND: 4
+      REPORTING_LEVEL: 2
+
+      # ModSecurity
+      MODSEC_RULE_ENGINE: "On"
+      MODSEC_AUDIT_ENGINE: "RelevantOnly"
+      MODSEC_AUDIT_LOG_FORMAT: "JSON"
+
+      # RustVault API methods
+      ALLOWED_METHODS: "GET HEAD POST PUT PATCH DELETE OPTIONS"
+
+      # JSON, form data and raw blob uploads
+      ALLOWED_REQUEST_CONTENT_TYPE: "|application/x-www-form-urlencoded| |multipart/form-data| |multipart/related| |application/json| |application/octet-stream| |text/xml| |application/xml|"
+
+      # RustVault blob limit: 100 MiB
+      MODSEC_REQ_BODY_LIMIT: 104857600
+      MODSEC_REQ_BODY_NOFILES_LIMIT: 104857600
+      MAX_FILE_SIZE: 104857600
+      COMBINED_FILE_SIZES: 104857600
+
+      # Do not redirect HTTP until a valid TLS certificate is installed.
+      NGINX_ALWAYS_TLS_REDIRECT: "off"
+
+      SERVER_TOKENS: "off"
+      SERVER_HEADER: ""
+
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
+
+      # Mount your real certificate and key here for production:
+      # - ./certs/fullchain.pem:/etc/nginx/conf/server.crt:ro
+      # - ./certs/privkey.pem:/etc/nginx/conf/server.key:ro
+
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - backend_net
+
+secrets:
+  rustvault_env:
+    file: ./rustvault.env
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+
+networks:
+  backend_net:
+    driver: bridge

@@ -1,0 +1,37 @@
+
+# Documentation
+/docs/
+
+# Rust build artifacts
+/target/
+**/target/
+
+# Git
+.git/
+.gitignore
+.gitkeep
+
+# Private keys and certificates
+/*.pem
+**/*.pem
+dev_private.pem
+dev_public.pem
+
+# Environment secrets
+/rustvault.env
+/dev.env
+.env
+.env.*
+
+# Docker
+/docker-compose.yml
+
+# Runtime-only configuration
+/nginx/
+/certs/
+
+# Editors and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

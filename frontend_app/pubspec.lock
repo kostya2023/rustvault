@@ -177,6 +177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.3.3"
+  ffi:
+    dependency: transitive
+    description:
+      name: ffi
+      sha256: "6d7fd89431262d8f3125e81b50d3847a091d846eafcd4fdb88dd06f36d705a45"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   file:
     dependency: transitive
     description:
@@ -219,8 +227,21 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
+  flutter_svg:
+    dependency: "direct main"
+    description:
+      name: flutter_svg
+      sha256: "100c19dcc4ff60083e95a44a6f44f3a1bb887d353c5d86f6a9b688aa3cb46236"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.2"
   flutter_test:
     dependency: "direct dev"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
+  flutter_web_plugins:
+    dependency: transitive
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -261,6 +282,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   http_multi_server:
     dependency: transitive
     description:
@@ -386,6 +415,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  path_parsing:
+    dependency: transitive
+    description:
+      name: path_parsing
+      sha256: "883402936929eac138ee0a45da5b0f2c80f89913e6dc3bf77eb65b84b409c6ca"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  petitparser:
+    dependency: transitive
+    description:
+      name: petitparser
+      sha256: "91bd59303e9f769f108f8df05e371341b15d59e995e6806aefab827b58336675"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.2"
   platform:
     dependency: transitive
     description:
@@ -434,6 +479,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.7.0"
+  qr:
+    dependency: transitive
+    description:
+      name: qr
+      sha256: "2c0189dca64a3ab08dda7acd7911c89af2374f08eb4eaded3e8ef4609f3b9c8b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.3"
+  qr_flutter:
+    dependency: "direct main"
+    description:
+      name: qr_flutter
+      sha256: "5095f0fc6e3f71d08adef8feccc8cea4f12eec18a2e31c2e8d82cb6019f4b097"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.0"
   rust_lib_frontend_app:
     dependency: "direct main"
     description:
@@ -542,6 +603,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  vector_graphics:
+    dependency: transitive
+    description:
+      name: vector_graphics
+      sha256: "82885f6ac633044e7a4e4d8d745724a67aa0dc50af5d8a81ec29379f63c29035"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.6"
+  vector_graphics_codec:
+    dependency: transitive
+    description:
+      name: vector_graphics_codec
+      sha256: "99fd9fbd34d9f9a32efd7b6a6aae14125d8237b10403b422a6a6dfeac2806146"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.13"
+  vector_graphics_compiler:
+    dependency: transitive
+    description:
+      name: vector_graphics_compiler
+      sha256: "4c9d2e7121eea8b4f160e6e435900a0ae7214cfc97c2d6cf84c25532b789b50d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.4"
   vector_math:
     dependency: transitive
     description:
@@ -590,6 +675,62 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
+  webauthn_secure_storage:
+    dependency: "direct main"
+    description:
+      name: webauthn_secure_storage
+      sha256: d01ad9bcf3bab01471dc49d85bb4b41f0862ced38047910b905415c444ccfc10
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.4"
+  webauthn_secure_storage_android:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_android
+      sha256: "9c6e9fdb822a25977e0ab684dec3c14c43ae16a748e5992614c9735fd508dcd4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
+  webauthn_secure_storage_darwin:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_darwin
+      sha256: d95240f7f1f8d1ed012cfa396fb66802bb0f6361275a3e842fd9e1c9f1e09d23
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  webauthn_secure_storage_linux:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_linux
+      sha256: cb2c70266f27fd3cdb0c481014067b2a7c2d57ef32b4a500a7f42b30a0bc630f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  webauthn_secure_storage_platform_interface:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_platform_interface
+      sha256: cefda23e8cc7330620556a2357344fa94075994f86602e0425901d04029b330b
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
+  webauthn_secure_storage_web:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_web
+      sha256: "01bbdd5b304a0ef6d5190c652932b62835526d7b2008080fb307a3a81ad74123"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
+  webauthn_secure_storage_windows:
+    dependency: transitive
+    description:
+      name: webauthn_secure_storage_windows
+      sha256: a46c908ee16f05687fd98b82ac0798005a8be48bd2374631741b3b1f73a0993e
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
   webdriver:
     dependency: transitive
     description:
@@ -598,6 +739,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.0"
+  xml:
+    dependency: transitive
+    description:
+      name: xml
+      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.1"
   yaml:
     dependency: transitive
     description:
@@ -608,4 +757,4 @@ packages:
     version: "3.1.4"
 sdks:
   dart: ">=3.13.5 <4.0.0"
-  flutter: ">=3.18.0-18.0.pre.54"
+  flutter: ">=3.41.0"

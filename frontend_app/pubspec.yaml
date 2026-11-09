@@ -38,6 +38,9 @@ dependencies:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
   freezed_annotation: ^3.1.0
+  webauthn_secure_storage: ^0.2.4
+  qr_flutter: ^4.1.0
+  flutter_svg: ^2.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

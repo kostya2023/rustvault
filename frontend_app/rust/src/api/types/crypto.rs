@@ -3,6 +3,7 @@ use zeroize::Zeroize;
 
 const BLOB_SALT_MAGIC: &[u8; 16] = b"RustVaultBlobV1!";
 const BLOB_SALT_SIZE: usize = 32;
+const BLOB_FORMAT_VERSION: &[u8; 1] = b"1";
 
 /// Raw blob prefix: 16-byte format magic followed by a 32-byte encryption salt.
 pub(crate) struct BlobSalt {
@@ -11,6 +12,7 @@ pub(crate) struct BlobSalt {
 
 impl BlobSalt {
     pub(crate) const PREFIX_SIZE: usize = BLOB_SALT_MAGIC.len() + BLOB_SALT_SIZE;
+    pub(crate) const VERSION: &'static [u8] = BLOB_FORMAT_VERSION;
 
     pub(crate) fn new(salt: [u8; BLOB_SALT_SIZE]) -> Self {
         Self { salt }
@@ -68,13 +70,16 @@ pub struct Keys {
 }
 
 #[derive(Serialize, Deserialize)]
-/// Vault header metadata, including the salt used for signing-key derivation.
+#[doc(hidden)]
+// Retained only for the existing generated bridge; crypto no longer reads this value.
 pub struct BlobHandler {
+    #[doc(hidden)]
     pub salt_verify: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
-/// The CBOR payload encrypted by `CryptoClient`.
+#[doc(hidden)]
+// Legacy bridge payload; new encryption serializes `Keys` directly.
 pub struct TbsBlob {
     pub handler: BlobHandler,
     pub keys: Keys,

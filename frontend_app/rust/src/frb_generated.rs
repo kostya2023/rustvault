@@ -48,7 +48,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2038558058;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -613294515;
 
 // Section: executor
 
@@ -119,21 +119,21 @@ fn wire__crate__api__clients__account_client__AccountClient_delete_with_passtotp
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AccountClient>>>::sse_decode(&mut deserializer);
 let api_access_token = <String>::sse_decode(&mut deserializer);
-let api_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
+let api_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
                     transform_result_sse::<_, crate::api::types::errors::SdkError>((move || async move {
                         let mut api_that_guard = None;
-let mut api_master_key_guard = None;
-let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_master_key, 1, false)]);
+let mut api_crypto_key_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_crypto_key, 1, false)]);
         for i in decode_indices_ {
             match i {
                 0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
-1 => api_master_key_guard = Some(api_master_key.lockable_decode_async_ref().await),
+1 => api_crypto_key_guard = Some(api_crypto_key.lockable_decode_async_ref().await),
                 _ => unreachable!(),
             }
         }
         let api_that_guard = api_that_guard.unwrap();
-let api_master_key_guard = api_master_key_guard.unwrap();
- let output_ok = crate::api::clients::account_client::AccountClient::delete_with_passtotp_step1(&*api_that_guard, api_access_token, &*api_master_key_guard).await?;   std::result::Result::Ok(output_ok)
+let api_crypto_key_guard = api_crypto_key_guard.unwrap();
+ let output_ok = crate::api::clients::account_client::AccountClient::delete_with_passtotp_step1(&*api_that_guard, api_access_token, &*api_crypto_key_guard).await?;   std::result::Result::Ok(output_ok)
                     })().await)
                 } })
 }
@@ -348,6 +348,57 @@ let api_ssl_ca_pinned_cert = <Option<Vec<u8>>>::sse_decode(&mut deserializer);de
                     })())
                 } })
 }
+fn wire__crate__api__types__blob__Blob_authentication_tag_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Blob_authentication_tag",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Blob>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>(
+                        crate::api::types::blob::Blob::authentication_tag(&*api_that_guard),
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__types__blob__Blob_deserialize_cbor_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -455,12 +506,12 @@ fn wire__crate__api__types__blob__Blob_new_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_blob = <Vec<u8>>::sse_decode(&mut deserializer);
-            let api_sign = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_tag = <Vec<u8>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, ()>((move || {
                     let output_ok =
-                        Ok::<_, ()>(crate::api::types::blob::Blob::new(api_blob, api_sign))?;
+                        Ok::<_, ()>(crate::api::types::blob::Blob::new(api_blob, api_tag))?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -642,22 +693,22 @@ fn wire__crate__api__clients__crypto_client__CryptoClient_decrypt_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>,
             >>::sse_decode(&mut deserializer);
-            let api_master_key = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
+            let api_crypto_key = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
             >>::sse_decode(&mut deserializer);
             let api_blob = <Blob>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
                     let mut api_that_guard = None;
-                    let mut api_master_key_guard = None;
+                    let mut api_crypto_key_guard = None;
                     let decode_indices_ =
                         flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
                             flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                 &api_that, 0, false,
                             ),
                             flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_master_key,
+                                &api_crypto_key,
                                 1,
                                 false,
                             ),
@@ -666,17 +717,85 @@ fn wire__crate__api__clients__crypto_client__CryptoClient_decrypt_impl(
                         match i {
                             0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
                             1 => {
-                                api_master_key_guard =
-                                    Some(api_master_key.lockable_decode_sync_ref())
+                                api_crypto_key_guard =
+                                    Some(api_crypto_key.lockable_decode_sync_ref())
                             }
                             _ => unreachable!(),
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let api_master_key_guard = api_master_key_guard.unwrap();
+                    let api_crypto_key_guard = api_crypto_key_guard.unwrap();
                     let output_ok = crate::api::clients::crypto_client::CryptoClient::decrypt(
                         &*api_that_guard,
-                        &*api_master_key_guard,
+                        &*api_crypto_key_guard,
+                        api_blob,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__clients__crypto_client__CryptoClient_decrypt_keys_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoClient_decrypt_keys",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_crypto_key = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
+            >>::sse_decode(&mut deserializer);
+            let api_blob = <Blob>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
+                    let mut api_that_guard = None;
+                    let mut api_crypto_key_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_crypto_key,
+                                1,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            1 => {
+                                api_crypto_key_guard =
+                                    Some(api_crypto_key.lockable_decode_sync_ref())
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let api_crypto_key_guard = api_crypto_key_guard.unwrap();
+                    let output_ok = crate::api::clients::crypto_client::CryptoClient::decrypt_keys(
+                        &*api_that_guard,
+                        &*api_crypto_key_guard,
                         api_blob,
                     )?;
                     std::result::Result::Ok(output_ok)
@@ -710,22 +829,22 @@ fn wire__crate__api__clients__crypto_client__CryptoClient_encrypt_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>,
             >>::sse_decode(&mut deserializer);
-            let api_master_key = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
+            let api_crypto_key = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
             >>::sse_decode(&mut deserializer);
             let api_tbs_blob = <crate::api::types::crypto::TbsBlob>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
                     let mut api_that_guard = None;
-                    let mut api_master_key_guard = None;
+                    let mut api_crypto_key_guard = None;
                     let decode_indices_ =
                         flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
                             flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                 &api_that, 0, false,
                             ),
                             flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_master_key,
+                                &api_crypto_key,
                                 1,
                                 false,
                             ),
@@ -734,18 +853,86 @@ fn wire__crate__api__clients__crypto_client__CryptoClient_encrypt_impl(
                         match i {
                             0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
                             1 => {
-                                api_master_key_guard =
-                                    Some(api_master_key.lockable_decode_sync_ref())
+                                api_crypto_key_guard =
+                                    Some(api_crypto_key.lockable_decode_sync_ref())
                             }
                             _ => unreachable!(),
                         }
                     }
                     let api_that_guard = api_that_guard.unwrap();
-                    let api_master_key_guard = api_master_key_guard.unwrap();
+                    let api_crypto_key_guard = api_crypto_key_guard.unwrap();
                     let output_ok = crate::api::clients::crypto_client::CryptoClient::encrypt(
                         &*api_that_guard,
-                        &*api_master_key_guard,
+                        &*api_crypto_key_guard,
                         api_tbs_blob,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__clients__crypto_client__CryptoClient_encrypt_keys_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoClient_encrypt_keys",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_crypto_key = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
+            >>::sse_decode(&mut deserializer);
+            let api_keys = <crate::api::types::crypto::Keys>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
+                    let mut api_that_guard = None;
+                    let mut api_crypto_key_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_crypto_key,
+                                1,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            1 => {
+                                api_crypto_key_guard =
+                                    Some(api_crypto_key.lockable_decode_sync_ref())
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let api_crypto_key_guard = api_crypto_key_guard.unwrap();
+                    let output_ok = crate::api::clients::crypto_client::CryptoClient::encrypt_keys(
+                        &*api_that_guard,
+                        &*api_crypto_key_guard,
+                        api_keys,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -995,6 +1182,184 @@ fn wire__crate__api__clients__crypto_client__CryptoClient_serialize_tbs_blob_imp
                             &*api_that_guard,
                             api_tbs_blob,
                         )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__types__master_key__CryptoKey_fingerprint_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoKey_fingerprint",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>(
+                        crate::api::types::master_key::CryptoKey::fingerprint(&*api_that_guard),
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__types__master_key__CryptoKey_from_user_password_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoKey_from_user_password",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_user_password = <UserPassword>::sse_decode(&mut deserializer);
+            let api_username = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(
+                        crate::api::types::master_key::CryptoKey::from_user_password(
+                            api_user_password,
+                            api_username,
+                        ),
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__types__master_key__CryptoKey_new_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoKey_new",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_username = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
+                    let output_ok = crate::api::types::master_key::CryptoKey::new(
+                        &api_password,
+                        &api_username,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__types__master_key__CryptoKey_zeroize_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "CryptoKey_zeroize",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, true,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let mut api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::types::master_key::CryptoKey::zeroize(&mut *api_that_guard);
+                    })?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1477,15 +1842,15 @@ fn wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step1_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpClient>,
             >>::sse_decode(&mut deserializer);
             let api_username = <String>::sse_decode(&mut deserializer);
-            let api_master_key = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
+            let api_crypto_key = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::types::errors::SdkError>(
                     (move || async move {
                         let mut api_that_guard = None;
-                        let mut api_master_key_guard = None;
+                        let mut api_crypto_key_guard = None;
                         let decode_indices_ =
                             flutter_rust_bridge::for_generated::lockable_compute_decode_order(
                                 vec![
@@ -1493,7 +1858,7 @@ fn wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step1_impl(
                                         &api_that, 0, false,
                                     ),
                                     flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                        &api_master_key,
+                                        &api_crypto_key,
                                         1,
                                         false,
                                     ),
@@ -1506,19 +1871,19 @@ fn wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step1_impl(
                                         Some(api_that.lockable_decode_async_ref().await)
                                 }
                                 1 => {
-                                    api_master_key_guard =
-                                        Some(api_master_key.lockable_decode_async_ref().await)
+                                    api_crypto_key_guard =
+                                        Some(api_crypto_key.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let api_master_key_guard = api_master_key_guard.unwrap();
+                        let api_crypto_key_guard = api_crypto_key_guard.unwrap();
                         let output_ok =
                             crate::api::clients::auth_client::LoginWithPasstotpClient::step1(
                                 &*api_that_guard,
                                 api_username,
-                                &*api_master_key_guard,
+                                &*api_crypto_key_guard,
                             )
                             .await?;
                         std::result::Result::Ok(output_ok)
@@ -1691,145 +2056,6 @@ fn wire__crate__api__types__flows__LoginWithPasstotpFlow_operation_id_impl(
                             &*api_that_guard,
                         ),
                     )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__types__master_key__MasterKey_fingerprint_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "MasterKey_fingerprint",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
-            >>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_that_guard = api_that_guard.unwrap();
-                    let output_ok = Ok::<_, ()>(
-                        crate::api::types::master_key::MasterKey::fingerprint(&*api_that_guard),
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__types__master_key__MasterKey_new_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "MasterKey_new",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_password = <Vec<u8>>::sse_decode(&mut deserializer);
-            let api_username = <Vec<u8>>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, crate::api::types::errors::SdkError>((move || {
-                    let output_ok = crate::api::types::master_key::MasterKey::new(
-                        &api_password,
-                        &api_username,
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__types__master_key__MasterKey_zeroize_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "MasterKey_zeroize",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
-            >>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, true,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let mut api_that_guard = api_that_guard.unwrap();
-                    let output_ok = Ok::<_, ()>({
-                        crate::api::types::master_key::MasterKey::zeroize(&mut *api_that_guard);
-                    })?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -2111,21 +2337,21 @@ fn wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_step1_
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RegistrationWithPasstotpClient>>>::sse_decode(&mut deserializer);
 let api_username = <String>::sse_decode(&mut deserializer);
-let api_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
+let api_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
                     transform_result_sse::<_, crate::api::types::errors::SdkError>((move || async move {
                         let mut api_that_guard = None;
-let mut api_master_key_guard = None;
-let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_master_key, 1, false)]);
+let mut api_crypto_key_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_crypto_key, 1, false)]);
         for i in decode_indices_ {
             match i {
                 0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
-1 => api_master_key_guard = Some(api_master_key.lockable_decode_async_ref().await),
+1 => api_crypto_key_guard = Some(api_crypto_key.lockable_decode_async_ref().await),
                 _ => unreachable!(),
             }
         }
         let api_that_guard = api_that_guard.unwrap();
-let api_master_key_guard = api_master_key_guard.unwrap();
- let output_ok = crate::api::clients::auth_client::RegistrationWithPasstotpClient::step1(&*api_that_guard, api_username, &*api_master_key_guard).await?;   std::result::Result::Ok(output_ok)
+let api_crypto_key_guard = api_crypto_key_guard.unwrap();
+ let output_ok = crate::api::clients::auth_client::RegistrationWithPasstotpClient::step1(&*api_that_guard, api_username, &*api_crypto_key_guard).await?;   std::result::Result::Ok(output_ok)
                     })().await)
                 } })
 }
@@ -2360,21 +2586,21 @@ fn wire__crate__api__clients__security_client__SecurityClient_change_password_wi
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SecurityClient>>>::sse_decode(&mut deserializer);
 let api_access_token = <String>::sse_decode(&mut deserializer);
-let api_new_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
+let api_new_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
                     transform_result_sse::<_, crate::api::types::errors::SdkError>((move || async move {
                         let mut api_that_guard = None;
-let mut api_new_master_key_guard = None;
-let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_new_master_key, 1, false)]);
+let mut api_new_crypto_key_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_new_crypto_key, 1, false)]);
         for i in decode_indices_ {
             match i {
                 0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
-1 => api_new_master_key_guard = Some(api_new_master_key.lockable_decode_async_ref().await),
+1 => api_new_crypto_key_guard = Some(api_new_crypto_key.lockable_decode_async_ref().await),
                 _ => unreachable!(),
             }
         }
         let api_that_guard = api_that_guard.unwrap();
-let api_new_master_key_guard = api_new_master_key_guard.unwrap();
- let output_ok = crate::api::clients::security_client::SecurityClient::change_password_with_passkey_step1(&*api_that_guard, api_access_token, &*api_new_master_key_guard).await?;   std::result::Result::Ok(output_ok)
+let api_new_crypto_key_guard = api_new_crypto_key_guard.unwrap();
+ let output_ok = crate::api::clients::security_client::SecurityClient::change_password_with_passkey_step1(&*api_that_guard, api_access_token, &*api_new_crypto_key_guard).await?;   std::result::Result::Ok(output_ok)
                     })().await)
                 } })
 }
@@ -2419,25 +2645,25 @@ fn wire__crate__api__clients__security_client__SecurityClient_change_password_wi
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SecurityClient>>>::sse_decode(&mut deserializer);
 let api_access_token = <String>::sse_decode(&mut deserializer);
-let api_current_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);
-let api_new_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
+let api_current_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);
+let api_new_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
                     transform_result_sse::<_, crate::api::types::errors::SdkError>((move || async move {
                         let mut api_that_guard = None;
-let mut api_current_master_key_guard = None;
-let mut api_new_master_key_guard = None;
-let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_current_master_key, 1, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_new_master_key, 2, false)]);
+let mut api_current_crypto_key_guard = None;
+let mut api_new_crypto_key_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_current_crypto_key, 1, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_new_crypto_key, 2, false)]);
         for i in decode_indices_ {
             match i {
                 0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
-1 => api_current_master_key_guard = Some(api_current_master_key.lockable_decode_async_ref().await),
-2 => api_new_master_key_guard = Some(api_new_master_key.lockable_decode_async_ref().await),
+1 => api_current_crypto_key_guard = Some(api_current_crypto_key.lockable_decode_async_ref().await),
+2 => api_new_crypto_key_guard = Some(api_new_crypto_key.lockable_decode_async_ref().await),
                 _ => unreachable!(),
             }
         }
         let api_that_guard = api_that_guard.unwrap();
-let api_current_master_key_guard = api_current_master_key_guard.unwrap();
-let api_new_master_key_guard = api_new_master_key_guard.unwrap();
- let output_ok = crate::api::clients::security_client::SecurityClient::change_password_with_totp_step1(&*api_that_guard, api_access_token, &*api_current_master_key_guard, &*api_new_master_key_guard).await?;   std::result::Result::Ok(output_ok)
+let api_current_crypto_key_guard = api_current_crypto_key_guard.unwrap();
+let api_new_crypto_key_guard = api_new_crypto_key_guard.unwrap();
+ let output_ok = crate::api::clients::security_client::SecurityClient::change_password_with_totp_step1(&*api_that_guard, api_access_token, &*api_current_crypto_key_guard, &*api_new_crypto_key_guard).await?;   std::result::Result::Ok(output_ok)
                     })().await)
                 } })
 }
@@ -2535,21 +2761,21 @@ fn wire__crate__api__clients__security_client__SecurityClient_change_totp_with_p
             let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SecurityClient>>>::sse_decode(&mut deserializer);
 let api_access_token = <String>::sse_decode(&mut deserializer);
-let api_master_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
+let api_crypto_key = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_decode(&mut deserializer);deserializer.end(); move |context| async move {
                     transform_result_sse::<_, crate::api::types::errors::SdkError>((move || async move {
                         let mut api_that_guard = None;
-let mut api_master_key_guard = None;
-let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_master_key, 1, false)]);
+let mut api_crypto_key_guard = None;
+let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false), flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_crypto_key, 1, false)]);
         for i in decode_indices_ {
             match i {
                 0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
-1 => api_master_key_guard = Some(api_master_key.lockable_decode_async_ref().await),
+1 => api_crypto_key_guard = Some(api_crypto_key.lockable_decode_async_ref().await),
                 _ => unreachable!(),
             }
         }
         let api_that_guard = api_that_guard.unwrap();
-let api_master_key_guard = api_master_key_guard.unwrap();
- let output_ok = crate::api::clients::security_client::SecurityClient::change_totp_with_password_step1(&*api_that_guard, api_access_token, &*api_master_key_guard).await?;   std::result::Result::Ok(output_ok)
+let api_crypto_key_guard = api_crypto_key_guard.unwrap();
+ let output_ok = crate::api::clients::security_client::SecurityClient::change_totp_with_password_step1(&*api_that_guard, api_access_token, &*api_crypto_key_guard).await?;   std::result::Result::Ok(output_ok)
                     })().await)
                 } })
 }
@@ -3206,6 +3432,41 @@ fn wire__crate__api__types__flows__TotpChangePasswordSession_totp_url_impl(
         },
     )
 }
+fn wire__crate__api__types__master_key__UserPassword_new_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "UserPassword_new",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::types::master_key::UserPassword::new(
+                        api_password,
+                    ))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__clients__vault_client__VaultClient_download_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3589,6 +3850,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HealthClient>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
@@ -3599,9 +3863,6 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>
-);
-flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
-    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PasswordChangePasskeySession>
@@ -3626,6 +3887,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<TotpChangePasswordSession>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VaultClient>
@@ -3658,6 +3922,16 @@ impl SseDecode for CryptoClient {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for CryptoKey {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -3698,16 +3972,6 @@ impl SseDecode for LoginWithPasstotpFlow {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>,
-        >>::sse_decode(deserializer);
-        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
-    }
-}
-
-impl SseDecode for MasterKey {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <RustOpaqueMoi<
-            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -3793,6 +4057,16 @@ impl SseDecode for TotpChangePasswordSession {
     }
 }
 
+impl SseDecode for UserPassword {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
 impl SseDecode for VaultClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3823,6 +4097,16 @@ impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpa
 
 impl SseDecode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3869,16 +4153,6 @@ impl SseDecode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>,
     >
-{
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <usize>::sse_decode(deserializer);
-        return decode_rust_opaque_moi(inner);
-    }
-}
-
-impl SseDecode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3971,6 +4245,16 @@ impl SseDecode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<TotpChangePasswordSession>,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4345,87 +4629,92 @@ fn pde_ffi_dispatcher_primary_impl(
 7 => wire__crate__api__clients__account_client__AccountClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
 8 => wire__crate__api__clients__account_client__AccountClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
 9 => wire__crate__api__clients__account_client__AccountClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-10 => wire__crate__api__types__blob__Blob_deserialize_cbor_impl(port, ptr, rust_vec_len, data_len),
-11 => wire__crate__api__types__blob__Blob_encrypted_bytes_impl(port, ptr, rust_vec_len, data_len),
-12 => wire__crate__api__types__blob__Blob_new_impl(port, ptr, rust_vec_len, data_len),
-13 => wire__crate__api__types__blob__Blob_serialize_cbor_impl(port, ptr, rust_vec_len, data_len),
-14 => wire__crate__api__types__blob__Blob_signature_impl(port, ptr, rust_vec_len, data_len),
-15 => wire__crate__api__types__blob__Blob_size_impl(port, ptr, rust_vec_len, data_len),
-16 => wire__crate__api__clients__crypto_client__CryptoClient_decrypt_impl(port, ptr, rust_vec_len, data_len),
-17 => wire__crate__api__clients__crypto_client__CryptoClient_encrypt_impl(port, ptr, rust_vec_len, data_len),
-18 => wire__crate__api__clients__crypto_client__CryptoClient_new_impl(port, ptr, rust_vec_len, data_len),
-19 => wire__crate__api__clients__crypto_client__CryptoClient_parse_keys_impl(port, ptr, rust_vec_len, data_len),
-20 => wire__crate__api__clients__crypto_client__CryptoClient_parse_tbs_blob_impl(port, ptr, rust_vec_len, data_len),
-21 => wire__crate__api__clients__crypto_client__CryptoClient_serialize_keys_impl(port, ptr, rust_vec_len, data_len),
-22 => wire__crate__api__clients__crypto_client__CryptoClient_serialize_tbs_blob_impl(port, ptr, rust_vec_len, data_len),
-23 => wire__crate__api__clients__health_client__HealthClient_check_impl(port, ptr, rust_vec_len, data_len),
-24 => wire__crate__api__clients__health_client__HealthClient_new_impl(port, ptr, rust_vec_len, data_len),
-25 => wire__crate__api__clients__health_client__HealthClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-26 => wire__crate__api__clients__health_client__HealthClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-27 => wire__crate__api__clients__health_client__HealthClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-28 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_new_impl(port, ptr, rust_vec_len, data_len),
-29 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-30 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_step1_impl(port, ptr, rust_vec_len, data_len),
-31 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_step2_impl(port, ptr, rust_vec_len, data_len),
-32 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-33 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-34 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_new_impl(port, ptr, rust_vec_len, data_len),
-35 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-36 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step1_impl(port, ptr, rust_vec_len, data_len),
-37 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step2_impl(port, ptr, rust_vec_len, data_len),
-38 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-39 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-40 => wire__crate__api__types__flows__LoginWithPasstotpFlow_operation_id_impl(port, ptr, rust_vec_len, data_len),
-41 => wire__crate__api__types__master_key__MasterKey_fingerprint_impl(port, ptr, rust_vec_len, data_len),
-42 => wire__crate__api__types__master_key__MasterKey_new_impl(port, ptr, rust_vec_len, data_len),
-43 => wire__crate__api__types__master_key__MasterKey_zeroize_impl(port, ptr, rust_vec_len, data_len),
-44 => wire__crate__api__types__flows__PasswordChangePasskeySession_operation_id_impl(port, ptr, rust_vec_len, data_len),
-45 => wire__crate__api__types__flows__PasswordChangePasskeySession_passkey_props_json_impl(port, ptr, rust_vec_len, data_len),
-46 => wire__crate__api__types__flows__PasswordChangeTotpSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
-47 => wire__crate__api__types__flows__PasswordDeleteSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
-48 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_new_impl(port, ptr, rust_vec_len, data_len),
-49 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-50 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_step1_impl(port, ptr, rust_vec_len, data_len),
-51 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_step2_impl(port, ptr, rust_vec_len, data_len),
-52 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-53 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-54 => wire__crate__api__types__flows__RegistrationWithPasstotpFlow_operation_id_impl(port, ptr, rust_vec_len, data_len),
-55 => wire__crate__api__types__flows__RegistrationWithPasstotpFlow_totp_url_impl(port, ptr, rust_vec_len, data_len),
-56 => wire__crate__api__clients__security_client__SecurityClient_add_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
-57 => wire__crate__api__clients__security_client__SecurityClient_add_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
-58 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
-59 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
-60 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_totp_step1_impl(port, ptr, rust_vec_len, data_len),
-61 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_totp_step2_impl(port, ptr, rust_vec_len, data_len),
-62 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
-63 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
-64 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_password_step1_impl(port, ptr, rust_vec_len, data_len),
-65 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_password_step2_impl(port, ptr, rust_vec_len, data_len),
-66 => wire__crate__api__clients__security_client__SecurityClient_delete_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
-67 => wire__crate__api__clients__security_client__SecurityClient_delete_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
-68 => wire__crate__api__clients__security_client__SecurityClient_get_events_impl(port, ptr, rust_vec_len, data_len),
-69 => wire__crate__api__clients__security_client__SecurityClient_get_passkeys_impl(port, ptr, rust_vec_len, data_len),
-70 => wire__crate__api__clients__security_client__SecurityClient_new_impl(port, ptr, rust_vec_len, data_len),
-71 => wire__crate__api__clients__security_client__SecurityClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-72 => wire__crate__api__clients__security_client__SecurityClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-73 => wire__crate__api__clients__security_client__SecurityClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-74 => wire__crate__api__clients__auth_client__TokenClient_logout_impl(port, ptr, rust_vec_len, data_len),
-75 => wire__crate__api__clients__auth_client__TokenClient_new_impl(port, ptr, rust_vec_len, data_len),
-76 => wire__crate__api__clients__auth_client__TokenClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-77 => wire__crate__api__clients__auth_client__TokenClient_refresh_impl(port, ptr, rust_vec_len, data_len),
-78 => wire__crate__api__clients__auth_client__TokenClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-79 => wire__crate__api__clients__auth_client__TokenClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-80 => wire__crate__api__types__flows__TotpChangePasswordSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
-81 => wire__crate__api__types__flows__TotpChangePasswordSession_totp_url_impl(port, ptr, rust_vec_len, data_len),
-82 => wire__crate__api__clients__vault_client__VaultClient_download_impl(port, ptr, rust_vec_len, data_len),
-83 => wire__crate__api__clients__vault_client__VaultClient_get_metadata_impl(port, ptr, rust_vec_len, data_len),
-84 => wire__crate__api__clients__vault_client__VaultClient_new_impl(port, ptr, rust_vec_len, data_len),
-85 => wire__crate__api__clients__vault_client__VaultClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-86 => wire__crate__api__clients__vault_client__VaultClient_upload_impl(port, ptr, rust_vec_len, data_len),
-87 => wire__crate__api__clients__vault_client__VaultClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
-88 => wire__crate__api__clients__vault_client__VaultClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
-89 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-90 => wire__crate__api__types__crypto__keys_default_impl(port, ptr, rust_vec_len, data_len),
+10 => wire__crate__api__types__blob__Blob_authentication_tag_impl(port, ptr, rust_vec_len, data_len),
+11 => wire__crate__api__types__blob__Blob_deserialize_cbor_impl(port, ptr, rust_vec_len, data_len),
+12 => wire__crate__api__types__blob__Blob_encrypted_bytes_impl(port, ptr, rust_vec_len, data_len),
+13 => wire__crate__api__types__blob__Blob_new_impl(port, ptr, rust_vec_len, data_len),
+14 => wire__crate__api__types__blob__Blob_serialize_cbor_impl(port, ptr, rust_vec_len, data_len),
+15 => wire__crate__api__types__blob__Blob_signature_impl(port, ptr, rust_vec_len, data_len),
+16 => wire__crate__api__types__blob__Blob_size_impl(port, ptr, rust_vec_len, data_len),
+17 => wire__crate__api__clients__crypto_client__CryptoClient_decrypt_impl(port, ptr, rust_vec_len, data_len),
+18 => wire__crate__api__clients__crypto_client__CryptoClient_decrypt_keys_impl(port, ptr, rust_vec_len, data_len),
+19 => wire__crate__api__clients__crypto_client__CryptoClient_encrypt_impl(port, ptr, rust_vec_len, data_len),
+20 => wire__crate__api__clients__crypto_client__CryptoClient_encrypt_keys_impl(port, ptr, rust_vec_len, data_len),
+21 => wire__crate__api__clients__crypto_client__CryptoClient_new_impl(port, ptr, rust_vec_len, data_len),
+22 => wire__crate__api__clients__crypto_client__CryptoClient_parse_keys_impl(port, ptr, rust_vec_len, data_len),
+23 => wire__crate__api__clients__crypto_client__CryptoClient_parse_tbs_blob_impl(port, ptr, rust_vec_len, data_len),
+24 => wire__crate__api__clients__crypto_client__CryptoClient_serialize_keys_impl(port, ptr, rust_vec_len, data_len),
+25 => wire__crate__api__clients__crypto_client__CryptoClient_serialize_tbs_blob_impl(port, ptr, rust_vec_len, data_len),
+26 => wire__crate__api__types__master_key__CryptoKey_fingerprint_impl(port, ptr, rust_vec_len, data_len),
+27 => wire__crate__api__types__master_key__CryptoKey_from_user_password_impl(port, ptr, rust_vec_len, data_len),
+28 => wire__crate__api__types__master_key__CryptoKey_new_impl(port, ptr, rust_vec_len, data_len),
+29 => wire__crate__api__types__master_key__CryptoKey_zeroize_impl(port, ptr, rust_vec_len, data_len),
+30 => wire__crate__api__clients__health_client__HealthClient_check_impl(port, ptr, rust_vec_len, data_len),
+31 => wire__crate__api__clients__health_client__HealthClient_new_impl(port, ptr, rust_vec_len, data_len),
+32 => wire__crate__api__clients__health_client__HealthClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+33 => wire__crate__api__clients__health_client__HealthClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+34 => wire__crate__api__clients__health_client__HealthClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+35 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_new_impl(port, ptr, rust_vec_len, data_len),
+36 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+37 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_step1_impl(port, ptr, rust_vec_len, data_len),
+38 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_step2_impl(port, ptr, rust_vec_len, data_len),
+39 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+40 => wire__crate__api__clients__auth_client__LoginWithPasskeyClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+41 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_new_impl(port, ptr, rust_vec_len, data_len),
+42 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+43 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step1_impl(port, ptr, rust_vec_len, data_len),
+44 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_step2_impl(port, ptr, rust_vec_len, data_len),
+45 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+46 => wire__crate__api__clients__auth_client__LoginWithPasstotpClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+47 => wire__crate__api__types__flows__LoginWithPasstotpFlow_operation_id_impl(port, ptr, rust_vec_len, data_len),
+48 => wire__crate__api__types__flows__PasswordChangePasskeySession_operation_id_impl(port, ptr, rust_vec_len, data_len),
+49 => wire__crate__api__types__flows__PasswordChangePasskeySession_passkey_props_json_impl(port, ptr, rust_vec_len, data_len),
+50 => wire__crate__api__types__flows__PasswordChangeTotpSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
+51 => wire__crate__api__types__flows__PasswordDeleteSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
+52 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_new_impl(port, ptr, rust_vec_len, data_len),
+53 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+54 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_step1_impl(port, ptr, rust_vec_len, data_len),
+55 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_step2_impl(port, ptr, rust_vec_len, data_len),
+56 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+57 => wire__crate__api__clients__auth_client__RegistrationWithPasstotpClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+58 => wire__crate__api__types__flows__RegistrationWithPasstotpFlow_operation_id_impl(port, ptr, rust_vec_len, data_len),
+59 => wire__crate__api__types__flows__RegistrationWithPasstotpFlow_totp_url_impl(port, ptr, rust_vec_len, data_len),
+60 => wire__crate__api__clients__security_client__SecurityClient_add_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
+61 => wire__crate__api__clients__security_client__SecurityClient_add_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
+62 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
+63 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
+64 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_totp_step1_impl(port, ptr, rust_vec_len, data_len),
+65 => wire__crate__api__clients__security_client__SecurityClient_change_password_with_totp_step2_impl(port, ptr, rust_vec_len, data_len),
+66 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
+67 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
+68 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_password_step1_impl(port, ptr, rust_vec_len, data_len),
+69 => wire__crate__api__clients__security_client__SecurityClient_change_totp_with_password_step2_impl(port, ptr, rust_vec_len, data_len),
+70 => wire__crate__api__clients__security_client__SecurityClient_delete_passkey_step1_impl(port, ptr, rust_vec_len, data_len),
+71 => wire__crate__api__clients__security_client__SecurityClient_delete_passkey_step2_impl(port, ptr, rust_vec_len, data_len),
+72 => wire__crate__api__clients__security_client__SecurityClient_get_events_impl(port, ptr, rust_vec_len, data_len),
+73 => wire__crate__api__clients__security_client__SecurityClient_get_passkeys_impl(port, ptr, rust_vec_len, data_len),
+74 => wire__crate__api__clients__security_client__SecurityClient_new_impl(port, ptr, rust_vec_len, data_len),
+75 => wire__crate__api__clients__security_client__SecurityClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+76 => wire__crate__api__clients__security_client__SecurityClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+77 => wire__crate__api__clients__security_client__SecurityClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+78 => wire__crate__api__clients__auth_client__TokenClient_logout_impl(port, ptr, rust_vec_len, data_len),
+79 => wire__crate__api__clients__auth_client__TokenClient_new_impl(port, ptr, rust_vec_len, data_len),
+80 => wire__crate__api__clients__auth_client__TokenClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+81 => wire__crate__api__clients__auth_client__TokenClient_refresh_impl(port, ptr, rust_vec_len, data_len),
+82 => wire__crate__api__clients__auth_client__TokenClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+83 => wire__crate__api__clients__auth_client__TokenClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+84 => wire__crate__api__types__flows__TotpChangePasswordSession_operation_id_impl(port, ptr, rust_vec_len, data_len),
+85 => wire__crate__api__types__flows__TotpChangePasswordSession_totp_url_impl(port, ptr, rust_vec_len, data_len),
+86 => wire__crate__api__types__master_key__UserPassword_new_impl(port, ptr, rust_vec_len, data_len),
+87 => wire__crate__api__clients__vault_client__VaultClient_download_impl(port, ptr, rust_vec_len, data_len),
+88 => wire__crate__api__clients__vault_client__VaultClient_get_metadata_impl(port, ptr, rust_vec_len, data_len),
+89 => wire__crate__api__clients__vault_client__VaultClient_new_impl(port, ptr, rust_vec_len, data_len),
+90 => wire__crate__api__clients__vault_client__VaultClient_new_with_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+91 => wire__crate__api__clients__vault_client__VaultClient_upload_impl(port, ptr, rust_vec_len, data_len),
+92 => wire__crate__api__clients__vault_client__VaultClient_with_base_url_impl(port, ptr, rust_vec_len, data_len),
+93 => wire__crate__api__clients__vault_client__VaultClient_with_base_url_and_root_of_trust_impl(port, ptr, rust_vec_len, data_len),
+94 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+95 => wire__crate__api__types__crypto__keys_default_impl(port, ptr, rust_vec_len, data_len),
                         _ => unreachable!(),
                     }
 }
@@ -4485,6 +4774,21 @@ impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<
 
 impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<CryptoClient>> for CryptoClient {
     fn into_into_dart(self) -> FrbWrapper<CryptoClient> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<CryptoKey> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<CryptoKey> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<CryptoKey>> for CryptoKey {
+    fn into_into_dart(self) -> FrbWrapper<CryptoKey> {
         self.into()
     }
 }
@@ -4560,21 +4864,6 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<LoginWithPasstotpFlow>>
     for LoginWithPasstotpFlow
 {
     fn into_into_dart(self) -> FrbWrapper<LoginWithPasstotpFlow> {
-        self.into()
-    }
-}
-
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for FrbWrapper<MasterKey> {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
-            .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<MasterKey> {}
-
-impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<MasterKey>> for MasterKey {
-    fn into_into_dart(self) -> FrbWrapper<MasterKey> {
         self.into()
     }
 }
@@ -4725,6 +5014,21 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<TotpChangePasswordSession>>
     for TotpChangePasswordSession
 {
     fn into_into_dart(self) -> FrbWrapper<TotpChangePasswordSession> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<UserPassword> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<UserPassword> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<UserPassword>> for UserPassword {
+    fn into_into_dart(self) -> FrbWrapper<UserPassword> {
         self.into()
     }
 }
@@ -5066,6 +5370,13 @@ impl SseEncode for CryptoClient {
     }
 }
 
+impl SseEncode for CryptoKey {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for HealthClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5106,13 +5417,6 @@ impl SseEncode for LoginWithPasstotpFlow {
             flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self),
             serializer,
         );
-    }
-}
-
-impl SseEncode for MasterKey {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
@@ -5202,6 +5506,13 @@ impl SseEncode for TotpChangePasswordSession {
     }
 }
 
+impl SseEncode for UserPassword {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for VaultClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5231,6 +5542,17 @@ impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpa
 
 impl SseEncode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5281,17 +5603,6 @@ impl SseEncode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>,
     >
-{
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        let (ptr, size) = self.sse_encode_raw();
-        <usize>::sse_encode(ptr, serializer);
-        <i32>::sse_encode(size, serializer);
-    }
-}
-
-impl SseEncode
-    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5392,6 +5703,17 @@ impl SseEncode
     for RustOpaqueMoi<
         flutter_rust_bridge::for_generated::RustAutoOpaqueInner<TotpChangePasswordSession>,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5749,6 +6071,20 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_frontend_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_frontend_app_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_frontend_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
         ptr: *const std::ffi::c_void,
     ) {
@@ -5802,20 +6138,6 @@ mod io {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>>::decrement_strong_count(ptr as _);
-    }
-
-    #[unsafe(no_mangle)]
-    pub extern "C" fn frbgen_frontend_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>::increment_strong_count(ptr as _);
-    }
-
-    #[unsafe(no_mangle)]
-    pub extern "C" fn frbgen_frontend_app_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>::decrement_strong_count(ptr as _);
     }
 
     #[unsafe(no_mangle)]
@@ -5943,6 +6265,20 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_frontend_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_frontend_app_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_frontend_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVaultClient(
         ptr: *const std::ffi::c_void,
     ) {
@@ -6032,6 +6368,20 @@ mod web {
     }
 
     #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>::decrement_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
         ptr: *const std::ffi::c_void,
     ) {
@@ -6085,20 +6435,6 @@ mod web {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LoginWithPasstotpFlow>>::decrement_strong_count(ptr as _);
-    }
-
-    #[wasm_bindgen]
-    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>::increment_strong_count(ptr as _);
-    }
-
-    #[wasm_bindgen]
-    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>::decrement_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]
@@ -6223,6 +6559,20 @@ mod web {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<TotpChangePasswordSession>>::decrement_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>::decrement_strong_count(ptr as _);
     }
 
     #[wasm_bindgen]

@@ -12,6 +12,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Blob>>
 abstract class Blob implements RustOpaqueInterface {
+  Future<Uint8List> authenticationTag();
+
   static Future<Blob> deserializeCbor({required List<int> encoded}) => RustLib
       .instance
       .api
@@ -22,8 +24,8 @@ abstract class Blob implements RustOpaqueInterface {
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
   static Future<Blob> newInstance({
     required List<int> blob,
-    required List<int> sign,
-  }) => RustLib.instance.api.crateApiTypesBlobBlobNew(blob: blob, sign: sign);
+    required List<int> tag,
+  }) => RustLib.instance.api.crateApiTypesBlobBlobNew(blob: blob, tag: tag);
 
   Future<Uint8List> serializeCbor();
 

@@ -11,16 +11,20 @@ import '../types/master_key.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `derive_key`, `derive_signing_key`, `random_bytes`
+// These functions are ignored because they are not marked as `pub`: `poly1305_tag`, `random_bytes`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoClient>>
 abstract class CryptoClient implements RustOpaqueInterface {
-  Future<TbsBlob> decrypt({required MasterKey masterKey, required Blob blob});
+  Future<TbsBlob> decrypt({required CryptoKey cryptoKey, required Blob blob});
+
+  Future<Keys> decryptKeys({required CryptoKey cryptoKey, required Blob blob});
 
   Future<Blob> encrypt({
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
     required TbsBlob tbsBlob,
   });
+
+  Future<Blob> encryptKeys({required CryptoKey cryptoKey, required Keys keys});
 
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
   static Future<CryptoClient> newInstance() =>

@@ -10,7 +10,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These functions are ignored because they are not marked as `pub`: `new`, `parse`, `salt`, `to_prefix`, `zeroize_password`, `zeroize_passwords`, `zeroize_passwords`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BlobSalt`
 
-/// Vault header metadata, including the salt used for signing-key derivation.
 class BlobHandler {
   final Uint8List saltVerify;
 
@@ -77,7 +76,6 @@ class Keys {
       other is Keys && runtimeType == other.runtimeType && keys == other.keys;
 }
 
-/// The CBOR payload encrypted by `CryptoClient`.
 class TbsBlob {
   final BlobHandler handler;
   final Keys keys;

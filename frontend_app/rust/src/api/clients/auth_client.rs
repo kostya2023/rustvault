@@ -4,7 +4,7 @@ use crate::{
         types::{
             auth::TokenPair,
             errors::SdkError,
-            master_key::MasterKey,
+            master_key::CryptoKey,
             flows::{LoginWithPasstotpFlow, RegistrationWithPasstotpFlow},
             security::PasskeyChallenge,
         },
@@ -252,9 +252,9 @@ impl LoginWithPasstotpClient {
     pub async fn step1(
         &self,
         username: String,
-        master_key: &MasterKey,
+        crypto_key: &CryptoKey,
     ) -> Result<LoginWithPasstotpFlow, SdkError> {
-        let password = master_key.opaque_password();
+        let password = crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let start = ClientLogin::<OpaqueCipherSuite>::start(&mut rng, &password)
             .map_err(|error| SdkError::Internal(format!("OPAQUE login failed: {error}")))?;
@@ -313,9 +313,9 @@ impl RegistrationWithPasstotpClient {
     pub async fn step1(
         &self,
         username: String,
-        master_key: &MasterKey,
+        crypto_key: &CryptoKey,
     ) -> Result<RegistrationWithPasstotpFlow, SdkError> {
-        let password = master_key.opaque_password();
+        let password = crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let start = ClientRegistration::<OpaqueCipherSuite>::start(&mut rng, &password)
             .map_err(|error| {

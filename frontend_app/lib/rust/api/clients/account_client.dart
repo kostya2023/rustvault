@@ -28,7 +28,7 @@ abstract class AccountClient implements RustOpaqueInterface {
 
   Future<PasswordDeleteSession> deleteWithPasstotpStep1({
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<void> deleteWithPasstotpStep2({

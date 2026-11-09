@@ -5,7 +5,7 @@ use crate::{
             account::AccountInfo,
             errors::SdkError,
             flows::PasswordDeleteSession,
-            master_key::MasterKey,
+            master_key::CryptoKey,
             security::PasskeyChallenge,
         },
     },
@@ -126,7 +126,7 @@ impl AccountClient {
     pub async fn delete_with_passtotp_step1(
         &self,
         access_token: String,
-        master_key: &MasterKey,
+        crypto_key: &CryptoKey,
     ) -> Result<PasswordDeleteSession, SdkError> {
         #[derive(serde::Deserialize)]
         struct Response {
@@ -139,7 +139,7 @@ impl AccountClient {
             password_request: String,
         }
 
-        let password = master_key.opaque_password();
+        let password = crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let start = ClientLogin::<crate::internal_types::opaque_cipher_suite::OpaqueCipherSuite>::start(
             &mut rng,

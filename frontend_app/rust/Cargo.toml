@@ -6,26 +6,36 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
+[[bin]]
+name = "full_e2e_test"
+path = "src/bin/full_e2e_test.rs"
+required-features = ["e2e"]
+
+[features]
+default = []
+e2e = ["dep:webauthn-authenticator-rs"]
+
 [dependencies]
 argon2 = "0.6.0"
 base64 = "0.23.1"
 blake3 = "1.8.7"
 chacha20poly1305 = "0.11.0"
 ciborium = "0.2.2"
-ed25519-dalek = { version = "2.2.0", features = ["zeroize"] }
 flutter_rust_bridge = "=2.13.0"
 hex = "0.4.3"
 hkdf = "0.12.4"
 opaque-ke = { version = "4.0.1", features = ["argon2"] }
+poly1305 = "0.9.1"
 reqwest = { version = "0.13.5", features = ["json"] }
 rand = { version = "0.8.8", features = ["getrandom"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10.9"
+subtle = "2.6.1"
 thiserror = "2.0.21"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 totp-rs = { version = "6.0.0", features = ["otpauth"] }
-webauthn-authenticator-rs = { version = "=0.5.5", features = ["softpasskey"] }
+webauthn-authenticator-rs = { version = "=0.5.5", features = ["softpasskey"], optional = true }
 zeroize = "1.9.1"
 
 [lints.rust]

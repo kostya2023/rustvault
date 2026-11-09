@@ -19,8 +19,8 @@ use rust_lib_frontend_app::api::{
     },
     types::{
         blob::Blob,
-        crypto::{BlobHandler, Key, Keys, TbsBlob},
-        master_key::MasterKey,
+        crypto::{Key, Keys},
+        master_key::{CryptoKey, UserPassword},
     },
 };
 use totp_rs::Totp;
@@ -114,8 +114,11 @@ fn expect_error<T, E: std::fmt::Display>(label: &str, result: Result<T, E>) -> E
     }
 }
 
-fn new_master_key(password: &str, username: &str) -> E2eResult<MasterKey> {
-    Ok(MasterKey::new(password.as_bytes(), username.as_bytes())?)
+fn new_crypto_key(password: &str, username: &str) -> E2eResult<CryptoKey> {
+    Ok(CryptoKey::from_user_password(
+        UserPassword::new(password.to_owned()),
+        username.to_owned(),
+    ))
 }
 
 fn totp_from_url(totp_url: String) -> E2eResult<Totp> {
@@ -223,21 +226,21 @@ async fn run() -> E2eResult<()> {
     // The server requires user verification; SoftPasskey simulates it in this test mode.
     let mut authenticator = SoftPasskey::new(true);
 
-    let mut master_key = new_master_key(&password, &username)?;
+    let mut crypto_key = new_crypto_key(&password, &username)?;
     let fingerprint = checked(
-        "MasterKey fingerprint",
-        Ok::<_, io::Error>(master_key.fingerprint()),
+        "CryptoKey fingerprint",
+        Ok::<_, io::Error>(crypto_key.fingerprint()),
     )?;
-    require("MasterKey fingerprint format", fingerprint.len() == 32)?;
-    let mut disposable_key = new_master_key("e2e-zeroize-check", &username)?;
+    require("CryptoKey fingerprint format", fingerprint.len() == 32)?;
+    let mut disposable_key = new_crypto_key("e2e-zeroize-check", &username)?;
     checked(
-        "MasterKey zeroize",
+        "CryptoKey zeroize",
         Ok::<_, io::Error>(disposable_key.zeroize()),
     )?;
 
     let registration_flow = checked(
         "RegistrationWithPasstotpClient::step1",
-        registration.step1(username.clone(), &master_key).await,
+        registration.step1(username.clone(), &crypto_key).await,
     )?;
     require(
         "Registration flow exposes its operation ID",
@@ -297,15 +300,8 @@ async fn run() -> E2eResult<()> {
             && parsed_keys.keys[0].password == "e2e-secret",
     )?;
 
-    let tbs_blob = TbsBlob {
-        handler: BlobHandler {
-            salt_verify: Vec::new(),
-        },
-        keys: parsed_keys,
-    };
-    let encoded_tbs = checked("CBOR serialize TbsBlob", crypto.serialize_tbs_blob(tbs_blob))?;
-    let parsed_tbs = checked("CBOR parse TbsBlob", crypto.parse_tbs_blob(encoded_tbs))?;
-    let encrypted_blob = checked("Encrypt + sign blob", crypto.encrypt(&master_key, parsed_tbs))?;
+    let encrypted_blob =
+        checked("Encrypt + authenticate blob", crypto.encrypt_keys(&crypto_key, parsed_keys))?;
     let envelope_bytes = checked(
         "Serialize Blob CBOR envelope",
         encrypted_blob.serialize_cbor(),
@@ -318,13 +314,13 @@ async fn run() -> E2eResult<()> {
         "Read encrypted blob bytes",
         Ok::<_, io::Error>(encrypted_copy.encrypted_bytes()),
     )?;
-    let signature = checked(
-        "Read blob signature",
-        Ok::<_, io::Error>(encrypted_copy.signature()),
+    let tag = checked(
+        "Read Poly1305 authentication tag",
+        Ok::<_, io::Error>(encrypted_copy.authentication_tag()),
     )?;
     require(
-        "Blob contains ciphertext and Ed25519 signature",
-        !encrypted_bytes.is_empty() && signature.len() == 64,
+        "Blob contains ciphertext and a Poly1305 tag",
+        !encrypted_bytes.is_empty() && tag.len() == 16,
     )?;
     let blob_size = checked(
         "Read Blob size",
@@ -332,8 +328,8 @@ async fn run() -> E2eResult<()> {
     )?;
     require("Blob size is non-zero", blob_size > 0)?;
     let rebuilt_blob = checked(
-        "Construct Blob from encrypted bytes and signature",
-        Ok::<_, io::Error>(Blob::new(encrypted_bytes.clone(), signature.clone())),
+        "Construct Blob from encrypted bytes and tag",
+        Ok::<_, io::Error>(Blob::new(encrypted_bytes.clone(), tag.clone())),
     )?;
     let rebuilt_envelope = checked("Serialize constructed Blob", rebuilt_blob.serialize_cbor())?;
     require("Blob constructor preserves the envelope", rebuilt_envelope == envelope_bytes)?;
@@ -342,7 +338,7 @@ async fn run() -> E2eResult<()> {
     tampered_bytes[last] ^= 1;
     expect_error(
         "Tampered ciphertext fails authenticated decryption",
-        crypto.decrypt(&master_key, Blob::new(tampered_bytes, signature.clone())),
+        crypto.decrypt_keys(&crypto_key, Blob::new(tampered_bytes, tag.clone())),
     )?;
     checked(
         "PUT /v1/blob (version 1)",
@@ -363,21 +359,21 @@ async fn run() -> E2eResult<()> {
         downloaded_v1_cbor == envelope_bytes,
     )?;
     let decrypted_v1 = checked(
-        "Decrypt + verify downloaded blob",
-        crypto.decrypt(&master_key, downloaded_v1),
+        "Decrypt + authenticate downloaded blob",
+        crypto.decrypt_keys(&crypto_key, downloaded_v1),
     )?;
     require(
         "Decrypted blob has the expected entry",
-        decrypted_v1.keys.keys.len() == 1
-            && decrypted_v1.keys.keys[0].username == "e2e-user",
+        decrypted_v1.keys.len() == 1
+            && decrypted_v1.keys[0].username == "e2e-user",
     )?;
-    let bad_signature_blob = Blob::new(
+    let bad_tag_blob = Blob::new(
         encrypted_bytes.clone(),
-        vec![0; signature.len()],
+        vec![0; tag.len()],
     );
     expect_error(
-        "Invalid Ed25519 signature is rejected",
-        crypto.decrypt(&master_key, bad_signature_blob),
+        "Invalid Poly1305 tag is rejected",
+        crypto.decrypt_keys(&crypto_key, bad_tag_blob),
     )?;
     let duplicate_v1 = checked(
         "Rebuild Blob for stale-version test",
@@ -388,22 +384,17 @@ async fn run() -> E2eResult<()> {
         vault.upload(access_token.clone(), duplicate_v1, 1).await,
     )?;
 
-    let replacement = TbsBlob {
-        handler: BlobHandler {
-            salt_verify: Vec::new(),
-        },
-        keys: Keys {
-            keys: vec![Key {
-                service_name: "e2e-replacement".to_owned(),
-                password: "second-secret".to_owned(),
-                username: "second-user".to_owned(),
-                user_comment: "version 2".to_owned(),
-            }],
-        },
+    let replacement = Keys {
+        keys: vec![Key {
+            service_name: "e2e-replacement".to_owned(),
+            password: "second-secret".to_owned(),
+            username: "second-user".to_owned(),
+            user_comment: "version 2".to_owned(),
+        }],
     };
     let replacement = checked(
         "Encrypt replacement blob",
-        crypto.encrypt(&master_key, replacement),
+        crypto.encrypt_keys(&crypto_key, replacement),
     )?;
     checked(
         "PUT /v1/blob (version 2 replacement)",
@@ -419,12 +410,12 @@ async fn run() -> E2eResult<()> {
         vault.download(access_token.clone()).await,
     )?;
     let decrypted_v2 = checked(
-        "Decrypt + verify replacement blob",
-        crypto.decrypt(&master_key, downloaded_v2),
+        "Decrypt + authenticate replacement blob",
+        crypto.decrypt_keys(&crypto_key, downloaded_v2),
     )?;
     require(
         "Replacement payload was stored",
-        decrypted_v2.keys.keys[0].service_name == "e2e-replacement",
+        decrypted_v2.keys[0].service_name == "e2e-replacement",
     )?;
 
     let (_refreshed_access, refreshed_refresh) = checked(
@@ -450,7 +441,7 @@ async fn run() -> E2eResult<()> {
 
     let login_flow = checked(
         "LoginWithPasstotpClient::step1",
-        login.step1(username.clone(), &master_key).await,
+        login.step1(username.clone(), &crypto_key).await,
     )?;
     require(
         "Login flow exposes its operation ID",
@@ -544,14 +535,14 @@ async fn run() -> E2eResult<()> {
     )?;
 
     let new_password_totp = format!("{password}-changed-totp");
-    let new_master_totp = new_master_key(&new_password_totp, &username)?;
+    let new_crypto_totp = new_crypto_key(&new_password_totp, &username)?;
     let mut password_change = checked(
         "POST /v1/security/changes/change-password/with-totp/step1",
         security
             .change_password_with_totp_step1(
                 access_token.clone(),
-                &master_key,
-                &new_master_totp,
+                &crypto_key,
+                &new_crypto_totp,
             )
             .await,
     )?;
@@ -569,11 +560,11 @@ async fn run() -> E2eResult<()> {
             )
             .await,
     )?;
-    master_key = new_master_totp;
+    crypto_key = new_crypto_totp;
     let (relogin_access, _) = checked(
         "TOTP login with the changed password",
         async {
-            let flow = login.step1(username.clone(), &master_key).await?;
+            let flow = login.step1(username.clone(), &crypto_key).await?;
             login.step2(flow, totp.generate_current().to_string()).await
         }
         .await,
@@ -583,7 +574,7 @@ async fn run() -> E2eResult<()> {
     let mut totp_change_password = checked(
         "POST /v1/security/changes/change-totp/with-password/step1",
         security
-            .change_totp_with_password_step1(access_token.clone(), &master_key)
+            .change_totp_with_password_step1(access_token.clone(), &crypto_key)
             .await,
     )?;
     require(
@@ -608,7 +599,7 @@ async fn run() -> E2eResult<()> {
     let (totp_changed_access, _) = checked(
         "TOTP login after replacing the TOTP secret",
         async {
-            let flow = login.step1(username.clone(), &master_key).await?;
+            let flow = login.step1(username.clone(), &crypto_key).await?;
             login.step2(flow, totp.generate_current().to_string()).await
         }
         .await,
@@ -646,11 +637,11 @@ async fn run() -> E2eResult<()> {
     totp = passkey_replacement_totp;
 
     let new_password_passkey = format!("{password}-changed-passkey");
-    let new_master_passkey = new_master_key(&new_password_passkey, &username)?;
+    let new_crypto_passkey = new_crypto_key(&new_password_passkey, &username)?;
     let mut passkey_password_change = checked(
         "POST /v1/security/changes/change-password/with-passkey/step1",
         security
-            .change_password_with_passkey_step1(access_token.clone(), &new_master_passkey)
+            .change_password_with_passkey_step1(access_token.clone(), &new_crypto_passkey)
             .await,
     )?;
     require(
@@ -675,12 +666,12 @@ async fn run() -> E2eResult<()> {
             )
             .await,
     )?;
-    master_key = new_master_passkey;
+    crypto_key = new_crypto_passkey;
 
     let (current_access, _) = checked(
         "TOTP login after both password changes",
         async {
-            let flow = login.step1(username.clone(), &master_key).await?;
+            let flow = login.step1(username.clone(), &crypto_key).await?;
             login.step2(flow, totp.generate_current().to_string()).await
         }
         .await,
@@ -778,11 +769,11 @@ async fn run() -> E2eResult<()> {
         account.get_info(access_token).await,
     )?;
 
-    let second_master_key = new_master_key(&password, &totp_username)?;
+    let second_crypto_key = new_crypto_key(&password, &totp_username)?;
     let second_registration_flow = checked(
         "Second disposable account registration step1",
         registration
-            .step1(totp_username.clone(), &second_master_key)
+            .step1(totp_username.clone(), &second_crypto_key)
             .await,
     )?;
     let second_totp = checked(
@@ -801,7 +792,7 @@ async fn run() -> E2eResult<()> {
     let mut account_deletion = checked(
         "POST /v1/account/delete/with-passtotp/step1",
         account
-            .delete_with_passtotp_step1(second_access.clone(), &second_master_key)
+            .delete_with_passtotp_step1(second_access.clone(), &second_crypto_key)
             .await,
     )?;
     require(

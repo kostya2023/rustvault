@@ -8,21 +8,38 @@ import 'errors.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `opaque_password`
+// These functions are ignored because they are not marked as `pub`: `as_bytes`, `derive_blob_key`, `derive_subkey`, `from_bytes`, `user_password_bytes`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `drop`
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MasterKey>>
-abstract class MasterKey implements RustOpaqueInterface {
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CryptoKey>>
+abstract class CryptoKey implements RustOpaqueInterface {
   Future<String> fingerprint();
 
+  static Future<CryptoKey> fromUserPassword({
+    required UserPassword userPassword,
+    required String username,
+  }) => RustLib.instance.api.crateApiTypesMasterKeyCryptoKeyFromUserPassword(
+    userPassword: userPassword,
+    username: username,
+  );
+
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
-  static Future<MasterKey> newInstance({
+  static Future<CryptoKey> newInstance({
     required List<int> password,
     required List<int> username,
-  }) => RustLib.instance.api.crateApiTypesMasterKeyMasterKeyNew(
+  }) => RustLib.instance.api.crateApiTypesMasterKeyCryptoKeyNew(
     password: password,
     username: username,
   );
 
   Future<void> zeroize();
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<UserPassword>>
+abstract class UserPassword implements RustOpaqueInterface {
+  // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
+  static Future<UserPassword> newInstance({required String password}) => RustLib
+      .instance
+      .api
+      .crateApiTypesMasterKeyUserPasswordNew(password: password);
 }

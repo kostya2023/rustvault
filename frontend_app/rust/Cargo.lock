@@ -762,7 +762,6 @@ version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
- "pkcs8",
  "serde",
  "signature",
 ]
@@ -779,7 +778,6 @@ dependencies = [
  "sha2 0.10.9",
  "signature",
  "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -2134,16 +2132,17 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "ciborium",
- "ed25519-dalek",
  "flutter_rust_bridge",
  "hex",
  "hkdf",
  "opaque-ke",
+ "poly1305",
  "rand 0.8.8",
  "reqwest",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "subtle",
  "thiserror 2.0.21",
  "tokio",
  "totp-rs",

@@ -82,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 2038558058;
+  int get rustContentHash => -613294515;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -111,7 +111,7 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsAccountClientAccountClientDeleteWithPasstotpStep1({
     required AccountClient that,
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<void>
@@ -144,6 +144,10 @@ abstract class RustLibApi extends BaseApi {
     Uint8List? sslCaPinnedCert,
   });
 
+  Future<Uint8List> crateApiTypesBlobBlobAuthenticationTag({
+    required Blob that,
+  });
+
   Future<Blob> crateApiTypesBlobBlobDeserializeCbor({
     required List<int> encoded,
   });
@@ -152,7 +156,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<Blob> crateApiTypesBlobBlobNew({
     required List<int> blob,
-    required List<int> sign,
+    required List<int> tag,
   });
 
   Future<Uint8List> crateApiTypesBlobBlobSerializeCbor({required Blob that});
@@ -163,14 +167,26 @@ abstract class RustLibApi extends BaseApi {
 
   Future<TbsBlob> crateApiClientsCryptoClientCryptoClientDecrypt({
     required CryptoClient that,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
+    required Blob blob,
+  });
+
+  Future<Keys> crateApiClientsCryptoClientCryptoClientDecryptKeys({
+    required CryptoClient that,
+    required CryptoKey cryptoKey,
     required Blob blob,
   });
 
   Future<Blob> crateApiClientsCryptoClientCryptoClientEncrypt({
     required CryptoClient that,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
     required TbsBlob tbsBlob,
+  });
+
+  Future<Blob> crateApiClientsCryptoClientCryptoClientEncryptKeys({
+    required CryptoClient that,
+    required CryptoKey cryptoKey,
+    required Keys keys,
   });
 
   Future<CryptoClient> crateApiClientsCryptoClientCryptoClientNew();
@@ -193,6 +209,24 @@ abstract class RustLibApi extends BaseApi {
   Future<Uint8List> crateApiClientsCryptoClientCryptoClientSerializeTbsBlob({
     required CryptoClient that,
     required TbsBlob tbsBlob,
+  });
+
+  Future<String> crateApiTypesMasterKeyCryptoKeyFingerprint({
+    required CryptoKey that,
+  });
+
+  Future<CryptoKey> crateApiTypesMasterKeyCryptoKeyFromUserPassword({
+    required UserPassword userPassword,
+    required String username,
+  });
+
+  Future<CryptoKey> crateApiTypesMasterKeyCryptoKeyNew({
+    required List<int> password,
+    required List<int> username,
+  });
+
+  Future<void> crateApiTypesMasterKeyCryptoKeyZeroize({
+    required CryptoKey that,
   });
 
   Future<HealthStatus> crateApiClientsHealthClientHealthClientCheck({
@@ -260,7 +294,7 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsAuthClientLoginWithPasstotpClientStep1({
     required LoginWithPasstotpClient that,
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<(String, String)>
@@ -283,19 +317,6 @@ abstract class RustLibApi extends BaseApi {
 
   Future<String> crateApiTypesFlowsLoginWithPasstotpFlowOperationId({
     required LoginWithPasstotpFlow that,
-  });
-
-  Future<String> crateApiTypesMasterKeyMasterKeyFingerprint({
-    required MasterKey that,
-  });
-
-  Future<MasterKey> crateApiTypesMasterKeyMasterKeyNew({
-    required List<int> password,
-    required List<int> username,
-  });
-
-  Future<void> crateApiTypesMasterKeyMasterKeyZeroize({
-    required MasterKey that,
   });
 
   Future<String> crateApiTypesFlowsPasswordChangePasskeySessionOperationId({
@@ -327,7 +348,7 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsAuthClientRegistrationWithPasstotpClientStep1({
     required RegistrationWithPasstotpClient that,
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<(String, String)>
@@ -374,7 +395,7 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsSecurityClientSecurityClientChangePasswordWithPasskeyStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey newMasterKey,
+    required CryptoKey newCryptoKey,
   });
 
   Future<void>
@@ -389,8 +410,8 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsSecurityClientSecurityClientChangePasswordWithTotpStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey currentMasterKey,
-    required MasterKey newMasterKey,
+    required CryptoKey currentCryptoKey,
+    required CryptoKey newCryptoKey,
   });
 
   Future<void>
@@ -420,7 +441,7 @@ abstract class RustLibApi extends BaseApi {
   crateApiClientsSecurityClientSecurityClientChangeTotpWithPasswordStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<void>
@@ -512,6 +533,10 @@ abstract class RustLibApi extends BaseApi {
     required TotpChangePasswordSession that,
   });
 
+  Future<UserPassword> crateApiTypesMasterKeyUserPasswordNew({
+    required String password,
+  });
+
   Future<Blob> crateApiClientsVaultClientVaultClientDownload({
     required VaultClient that,
     required String accessToken,
@@ -573,6 +598,14 @@ abstract class RustLibApi extends BaseApi {
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CryptoClientPtr;
 
   RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_CryptoKey;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_CryptoKey;
+
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CryptoKeyPtr;
+
+  RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_HealthClient;
 
   RustArcDecrementStrongCountFnType
@@ -606,14 +639,6 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_LoginWithPasstotpFlowPtr;
-
-  RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_MasterKey;
-
-  RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_MasterKey;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_MasterKeyPtr;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_PasswordChangePasskeySession;
@@ -685,6 +710,14 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_TotpChangePasswordSessionPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_UserPassword;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_UserPassword;
+
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_UserPasswordPtr;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_VaultClient;
@@ -793,7 +826,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsAccountClientAccountClientDeleteWithPasstotpStep1({
     required AccountClient that,
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -804,8 +837,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(accessToken, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           pdeCallFfi(
@@ -822,7 +855,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsAccountClientAccountClientDeleteWithPasstotpStep1ConstMeta,
-        argValues: [that, accessToken, masterKey],
+        argValues: [that, accessToken, cryptoKey],
         apiImpl: this,
       ),
     );
@@ -832,7 +865,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsAccountClientAccountClientDeleteWithPasstotpStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "AccountClient_delete_with_passtotp_step1",
-        argNames: ["that", "accessToken", "masterKey"],
+        argNames: ["that", "accessToken", "cryptoKey"],
       );
 
   @override
@@ -1063,6 +1096,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<Uint8List> crateApiTypesBlobBlobAuthenticationTag({
+    required Blob that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlob(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTypesBlobBlobAuthenticationTagConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesBlobBlobAuthenticationTagConstMeta =>
+      const TaskConstMeta(
+        debugName: "Blob_authentication_tag",
+        argNames: ["that"],
+      );
+
+  @override
   Future<Blob> crateApiTypesBlobBlobDeserializeCbor({
     required List<int> encoded,
   }) {
@@ -1074,7 +1143,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -1109,7 +1178,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -1133,18 +1202,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<Blob> crateApiTypesBlobBlobNew({
     required List<int> blob,
-    required List<int> sign,
+    required List<int> tag,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_list_prim_u_8_loose(blob, serializer);
-          sse_encode_list_prim_u_8_loose(sign, serializer);
+          sse_encode_list_prim_u_8_loose(tag, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -1154,14 +1223,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiTypesBlobBlobNewConstMeta,
-        argValues: [blob, sign],
+        argValues: [blob, tag],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiTypesBlobBlobNewConstMeta =>
-      const TaskConstMeta(debugName: "Blob_new", argNames: ["blob", "sign"]);
+      const TaskConstMeta(debugName: "Blob_new", argNames: ["blob", "tag"]);
 
   @override
   Future<Uint8List> crateApiTypesBlobBlobSerializeCbor({required Blob that}) {
@@ -1176,7 +1245,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 14,
             port: port_,
           );
         },
@@ -1207,7 +1276,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 15,
             port: port_,
           );
         },
@@ -1238,7 +1307,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -1259,7 +1328,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<TbsBlob> crateApiClientsCryptoClientCryptoClientDecrypt({
     required CryptoClient that,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
     required Blob blob,
   }) {
     return handler.executeNormal(
@@ -1270,8 +1339,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlob(
@@ -1281,7 +1350,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -1290,7 +1359,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_sdk_error,
         ),
         constMeta: kCrateApiClientsCryptoClientCryptoClientDecryptConstMeta,
-        argValues: [that, masterKey, blob],
+        argValues: [that, cryptoKey, blob],
         apiImpl: this,
       ),
     );
@@ -1299,13 +1368,60 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiClientsCryptoClientCryptoClientDecryptConstMeta =>
       const TaskConstMeta(
         debugName: "CryptoClient_decrypt",
-        argNames: ["that", "masterKey", "blob"],
+        argNames: ["that", "cryptoKey", "blob"],
+      );
+
+  @override
+  Future<Keys> crateApiClientsCryptoClientCryptoClientDecryptKeys({
+    required CryptoClient that,
+    required CryptoKey cryptoKey,
+    required Blob blob,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoClient(
+            that,
+            serializer,
+          );
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
+            serializer,
+          );
+          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlob(
+            blob,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_keys,
+          decodeErrorData: sse_decode_sdk_error,
+        ),
+        constMeta: kCrateApiClientsCryptoClientCryptoClientDecryptKeysConstMeta,
+        argValues: [that, cryptoKey, blob],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiClientsCryptoClientCryptoClientDecryptKeysConstMeta =>
+      const TaskConstMeta(
+        debugName: "CryptoClient_decrypt_keys",
+        argNames: ["that", "cryptoKey", "blob"],
       );
 
   @override
   Future<Blob> crateApiClientsCryptoClientCryptoClientEncrypt({
     required CryptoClient that,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
     required TbsBlob tbsBlob,
   }) {
     return handler.executeNormal(
@@ -1316,15 +1432,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           sse_encode_box_autoadd_tbs_blob(tbsBlob, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 19,
             port: port_,
           );
         },
@@ -1334,7 +1450,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_sdk_error,
         ),
         constMeta: kCrateApiClientsCryptoClientCryptoClientEncryptConstMeta,
-        argValues: [that, masterKey, tbsBlob],
+        argValues: [that, cryptoKey, tbsBlob],
         apiImpl: this,
       ),
     );
@@ -1343,7 +1459,52 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiClientsCryptoClientCryptoClientEncryptConstMeta =>
       const TaskConstMeta(
         debugName: "CryptoClient_encrypt",
-        argNames: ["that", "masterKey", "tbsBlob"],
+        argNames: ["that", "cryptoKey", "tbsBlob"],
+      );
+
+  @override
+  Future<Blob> crateApiClientsCryptoClientCryptoClientEncryptKeys({
+    required CryptoClient that,
+    required CryptoKey cryptoKey,
+    required Keys keys,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoClient(
+            that,
+            serializer,
+          );
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
+            serializer,
+          );
+          sse_encode_box_autoadd_keys(keys, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlob,
+          decodeErrorData: sse_decode_sdk_error,
+        ),
+        constMeta: kCrateApiClientsCryptoClientCryptoClientEncryptKeysConstMeta,
+        argValues: [that, cryptoKey, keys],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiClientsCryptoClientCryptoClientEncryptKeysConstMeta =>
+      const TaskConstMeta(
+        debugName: "CryptoClient_encrypt_keys",
+        argNames: ["that", "cryptoKey", "keys"],
       );
 
   @override
@@ -1355,7 +1516,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1391,7 +1552,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1430,7 +1591,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1470,7 +1631,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1510,7 +1671,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1534,6 +1695,150 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiTypesMasterKeyCryptoKeyFingerprint({
+    required CryptoKey that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTypesMasterKeyCryptoKeyFingerprintConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesMasterKeyCryptoKeyFingerprintConstMeta =>
+      const TaskConstMeta(
+        debugName: "CryptoKey_fingerprint",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<CryptoKey> crateApiTypesMasterKeyCryptoKeyFromUserPassword({
+    required UserPassword userPassword,
+    required String username,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+            userPassword,
+            serializer,
+          );
+          sse_encode_String(username, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTypesMasterKeyCryptoKeyFromUserPasswordConstMeta,
+        argValues: [userPassword, username],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesMasterKeyCryptoKeyFromUserPasswordConstMeta =>
+      const TaskConstMeta(
+        debugName: "CryptoKey_from_user_password",
+        argNames: ["userPassword", "username"],
+      );
+
+  @override
+  Future<CryptoKey> crateApiTypesMasterKeyCryptoKeyNew({
+    required List<int> password,
+    required List<int> username,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_8_loose(password, serializer);
+          sse_encode_list_prim_u_8_loose(username, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey,
+          decodeErrorData: sse_decode_sdk_error,
+        ),
+        constMeta: kCrateApiTypesMasterKeyCryptoKeyNewConstMeta,
+        argValues: [password, username],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesMasterKeyCryptoKeyNewConstMeta =>
+      const TaskConstMeta(
+        debugName: "CryptoKey_new",
+        argNames: ["password", "username"],
+      );
+
+  @override
+  Future<void> crateApiTypesMasterKeyCryptoKeyZeroize({
+    required CryptoKey that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTypesMasterKeyCryptoKeyZeroizeConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesMasterKeyCryptoKeyZeroizeConstMeta =>
+      const TaskConstMeta(debugName: "CryptoKey_zeroize", argNames: ["that"]);
+
+  @override
   Future<HealthStatus> crateApiClientsHealthClientHealthClientCheck({
     required HealthClient that,
   }) {
@@ -1548,7 +1853,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1575,7 +1880,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1607,7 +1912,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1643,7 +1948,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1681,7 +1986,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1715,7 +2020,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1751,7 +2056,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1793,7 +2098,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1836,7 +2141,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1872,7 +2177,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1911,7 +2216,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1945,7 +2250,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1982,7 +2287,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 42,
             port: port_,
           );
         },
@@ -2011,7 +2316,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsAuthClientLoginWithPasstotpClientStep1({
     required LoginWithPasstotpClient that,
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2022,14 +2327,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(username, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 43,
             port: port_,
           );
         },
@@ -2040,7 +2345,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsAuthClientLoginWithPasstotpClientStep1ConstMeta,
-        argValues: [that, username, masterKey],
+        argValues: [that, username, cryptoKey],
         apiImpl: this,
       ),
     );
@@ -2050,7 +2355,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsAuthClientLoginWithPasstotpClientStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "LoginWithPasstotpClient_step1",
-        argNames: ["that", "username", "masterKey"],
+        argNames: ["that", "username", "cryptoKey"],
       );
 
   @override
@@ -2076,7 +2381,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 44,
             port: port_,
           );
         },
@@ -2112,7 +2417,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 45,
             port: port_,
           );
         },
@@ -2151,7 +2456,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 46,
             port: port_,
           );
         },
@@ -2190,7 +2495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 47,
             port: port_,
           );
         },
@@ -2213,111 +2518,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<String> crateApiTypesMasterKeyMasterKeyFingerprint({
-    required MasterKey that,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 41,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_String,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiTypesMasterKeyMasterKeyFingerprintConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiTypesMasterKeyMasterKeyFingerprintConstMeta =>
-      const TaskConstMeta(
-        debugName: "MasterKey_fingerprint",
-        argNames: ["that"],
-      );
-
-  @override
-  Future<MasterKey> crateApiTypesMasterKeyMasterKeyNew({
-    required List<int> password,
-    required List<int> username,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_list_prim_u_8_loose(password, serializer);
-          sse_encode_list_prim_u_8_loose(username, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 42,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData:
-              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey,
-          decodeErrorData: sse_decode_sdk_error,
-        ),
-        constMeta: kCrateApiTypesMasterKeyMasterKeyNewConstMeta,
-        argValues: [password, username],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiTypesMasterKeyMasterKeyNewConstMeta =>
-      const TaskConstMeta(
-        debugName: "MasterKey_new",
-        argNames: ["password", "username"],
-      );
-
-  @override
-  Future<void> crateApiTypesMasterKeyMasterKeyZeroize({
-    required MasterKey that,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 43,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiTypesMasterKeyMasterKeyZeroizeConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiTypesMasterKeyMasterKeyZeroizeConstMeta =>
-      const TaskConstMeta(debugName: "MasterKey_zeroize", argNames: ["that"]);
-
-  @override
   Future<String> crateApiTypesFlowsPasswordChangePasskeySessionOperationId({
     required PasswordChangePasskeySession that,
   }) {
@@ -2332,7 +2532,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 48,
             port: port_,
           );
         },
@@ -2371,7 +2571,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 49,
             port: port_,
           );
         },
@@ -2409,7 +2609,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 50,
             port: port_,
           );
         },
@@ -2447,7 +2647,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 51,
             port: port_,
           );
         },
@@ -2479,7 +2679,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2516,7 +2716,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2545,7 +2745,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsAuthClientRegistrationWithPasstotpClientStep1({
     required RegistrationWithPasstotpClient that,
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2556,14 +2756,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(username, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2574,7 +2774,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsAuthClientRegistrationWithPasstotpClientStep1ConstMeta,
-        argValues: [that, username, masterKey],
+        argValues: [that, username, cryptoKey],
         apiImpl: this,
       ),
     );
@@ -2584,7 +2784,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsAuthClientRegistrationWithPasstotpClientStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "RegistrationWithPasstotpClient_step1",
-        argNames: ["that", "username", "masterKey"],
+        argNames: ["that", "username", "cryptoKey"],
       );
 
   @override
@@ -2610,7 +2810,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 55,
             port: port_,
           );
         },
@@ -2646,7 +2846,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 56,
             port: port_,
           );
         },
@@ -2685,7 +2885,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 57,
             port: port_,
           );
         },
@@ -2725,7 +2925,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 58,
             port: port_,
           );
         },
@@ -2763,7 +2963,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 59,
             port: port_,
           );
         },
@@ -2804,7 +3004,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 56,
+            funcId: 60,
             port: port_,
           );
         },
@@ -2850,7 +3050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 61,
             port: port_,
           );
         },
@@ -2884,7 +3084,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsSecurityClientSecurityClientChangePasswordWithPasskeyStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey newMasterKey,
+    required CryptoKey newCryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2895,14 +3095,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(accessToken, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            newMasterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            newCryptoKey,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 58,
+            funcId: 62,
             port: port_,
           );
         },
@@ -2913,7 +3113,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsSecurityClientSecurityClientChangePasswordWithPasskeyStep1ConstMeta,
-        argValues: [that, accessToken, newMasterKey],
+        argValues: [that, accessToken, newCryptoKey],
         apiImpl: this,
       ),
     );
@@ -2923,7 +3123,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsSecurityClientSecurityClientChangePasswordWithPasskeyStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "SecurityClient_change_password_with_passkey_step1",
-        argNames: ["that", "accessToken", "newMasterKey"],
+        argNames: ["that", "accessToken", "newCryptoKey"],
       );
 
   @override
@@ -2951,7 +3151,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 59,
+            funcId: 63,
             port: port_,
           );
         },
@@ -2979,8 +3179,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsSecurityClientSecurityClientChangePasswordWithTotpStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey currentMasterKey,
-    required MasterKey newMasterKey,
+    required CryptoKey currentCryptoKey,
+    required CryptoKey newCryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2991,18 +3191,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(accessToken, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            currentMasterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            currentCryptoKey,
             serializer,
           );
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            newMasterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            newCryptoKey,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 60,
+            funcId: 64,
             port: port_,
           );
         },
@@ -3013,7 +3213,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsSecurityClientSecurityClientChangePasswordWithTotpStep1ConstMeta,
-        argValues: [that, accessToken, currentMasterKey, newMasterKey],
+        argValues: [that, accessToken, currentCryptoKey, newCryptoKey],
         apiImpl: this,
       ),
     );
@@ -3023,7 +3223,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsSecurityClientSecurityClientChangePasswordWithTotpStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "SecurityClient_change_password_with_totp_step1",
-        argNames: ["that", "accessToken", "currentMasterKey", "newMasterKey"],
+        argNames: ["that", "accessToken", "currentCryptoKey", "newCryptoKey"],
       );
 
   @override
@@ -3051,7 +3251,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 61,
+            funcId: 65,
             port: port_,
           );
         },
@@ -3092,7 +3292,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 62,
+            funcId: 66,
             port: port_,
           );
         },
@@ -3139,7 +3339,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 63,
+            funcId: 67,
             port: port_,
           );
         },
@@ -3173,7 +3373,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   crateApiClientsSecurityClientSecurityClientChangeTotpWithPasswordStep1({
     required SecurityClient that,
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -3184,14 +3384,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(accessToken, serializer);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-            masterKey,
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+            cryptoKey,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 64,
+            funcId: 68,
             port: port_,
           );
         },
@@ -3202,7 +3402,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiClientsSecurityClientSecurityClientChangeTotpWithPasswordStep1ConstMeta,
-        argValues: [that, accessToken, masterKey],
+        argValues: [that, accessToken, cryptoKey],
         apiImpl: this,
       ),
     );
@@ -3212,7 +3412,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiClientsSecurityClientSecurityClientChangeTotpWithPasswordStep1ConstMeta =>
       const TaskConstMeta(
         debugName: "SecurityClient_change_totp_with_password_step1",
-        argNames: ["that", "accessToken", "masterKey"],
+        argNames: ["that", "accessToken", "cryptoKey"],
       );
 
   @override
@@ -3240,7 +3440,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 65,
+            funcId: 69,
             port: port_,
           );
         },
@@ -3283,7 +3483,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 66,
+            funcId: 70,
             port: port_,
           );
         },
@@ -3329,7 +3529,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 67,
+            funcId: 71,
             port: port_,
           );
         },
@@ -3386,7 +3586,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 68,
+            funcId: 72,
             port: port_,
           );
         },
@@ -3427,7 +3627,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 69,
+            funcId: 73,
             port: port_,
           );
         },
@@ -3459,7 +3659,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 70,
+            funcId: 74,
             port: port_,
           );
         },
@@ -3491,7 +3691,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 71,
+            funcId: 75,
             port: port_,
           );
         },
@@ -3528,7 +3728,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 72,
+            funcId: 76,
             port: port_,
           );
         },
@@ -3567,7 +3767,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 73,
+            funcId: 77,
             port: port_,
           );
         },
@@ -3608,7 +3808,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 74,
+            funcId: 78,
             port: port_,
           );
         },
@@ -3638,7 +3838,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 75,
+            funcId: 79,
             port: port_,
           );
         },
@@ -3669,7 +3869,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 76,
+            funcId: 80,
             port: port_,
           );
         },
@@ -3710,7 +3910,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 77,
+            funcId: 81,
             port: port_,
           );
         },
@@ -3743,7 +3943,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 78,
+            funcId: 82,
             port: port_,
           );
         },
@@ -3780,7 +3980,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 79,
+            funcId: 83,
             port: port_,
           );
         },
@@ -3819,7 +4019,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 80,
+            funcId: 84,
             port: port_,
           );
         },
@@ -3857,7 +4057,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 81,
+            funcId: 85,
             port: port_,
           );
         },
@@ -3880,6 +4080,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<UserPassword> crateApiTypesMasterKeyUserPasswordNew({
+    required String password,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 86,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTypesMasterKeyUserPasswordNewConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTypesMasterKeyUserPasswordNewConstMeta =>
+      const TaskConstMeta(
+        debugName: "UserPassword_new",
+        argNames: ["password"],
+      );
+
+  @override
   Future<Blob> crateApiClientsVaultClientVaultClientDownload({
     required VaultClient that,
     required String accessToken,
@@ -3896,7 +4130,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 82,
+            funcId: 87,
             port: port_,
           );
         },
@@ -3935,7 +4169,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 83,
+            funcId: 88,
             port: port_,
           );
         },
@@ -3966,7 +4200,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 84,
+            funcId: 89,
             port: port_,
           );
         },
@@ -3997,7 +4231,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 85,
+            funcId: 90,
             port: port_,
           );
         },
@@ -4045,7 +4279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 86,
+            funcId: 91,
             port: port_,
           );
         },
@@ -4078,7 +4312,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 87,
+            funcId: 92,
             port: port_,
           );
         },
@@ -4116,7 +4350,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 88,
+            funcId: 93,
             port: port_,
           );
         },
@@ -4149,7 +4383,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 89,
+            funcId: 94,
             port: port_,
           );
         },
@@ -4176,7 +4410,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 90,
+            funcId: 95,
             port: port_,
           );
         },
@@ -4219,6 +4453,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoClient;
 
   RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_CryptoKey => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_CryptoKey => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey;
+
+  RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_HealthClient => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient;
 
@@ -4249,14 +4491,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
   get rust_arc_decrement_strong_count_LoginWithPasstotpFlow => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerLoginWithPasstotpFlow;
-
-  RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_MasterKey => wire
-      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey;
-
-  RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_MasterKey => wire
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_PasswordChangePasskeySession => wire
@@ -4323,6 +4557,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerTotpChangePasswordSession;
 
   RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_UserPassword => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_UserPassword => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword;
+
+  RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_VaultClient => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVaultClient;
 
@@ -4355,6 +4597,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return CryptoClientImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  CryptoKey
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -4395,15 +4646,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  MasterKey
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -4489,6 +4731,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  UserPassword
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return UserPasswordImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   VaultClient
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVaultClient(
     dynamic raw,
@@ -4498,12 +4749,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MasterKey
-  dco_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
+  CryptoKey
+  dco_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
+    return CryptoKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -4576,6 +4827,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CryptoKey
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   HealthClient
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     dynamic raw,
@@ -4613,15 +4873,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  MasterKey
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -4743,6 +4994,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CryptoKey
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   HealthClient
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     dynamic raw,
@@ -4780,15 +5040,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  MasterKey
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -4871,6 +5122,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return TotpChangePasswordSessionImpl.frbInternalDcoDecode(
       raw as List<dynamic>,
     );
+  }
+
+  @protected
+  UserPassword
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return UserPasswordImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -5191,6 +5451,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CryptoKey
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   HealthClient
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     SseDeserializer deserializer,
@@ -5233,18 +5505,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
-  }
-
-  @protected
-  MasterKey
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -5347,6 +5607,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  UserPassword
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return UserPasswordImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   VaultClient
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVaultClient(
     SseDeserializer deserializer,
@@ -5359,12 +5631,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MasterKey
-  sse_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
+  CryptoKey
+  sse_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalSseDecode(
+    return CryptoKeyImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -5455,6 +5727,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CryptoKey
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   HealthClient
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     SseDeserializer deserializer,
@@ -5497,18 +5781,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
-  }
-
-  @protected
-  MasterKey
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -5659,6 +5931,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CryptoKey
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return CryptoKeyImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   HealthClient
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     SseDeserializer deserializer,
@@ -5701,18 +5985,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return LoginWithPasstotpFlowImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
-  }
-
-  @protected
-  MasterKey
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MasterKeyImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -5809,6 +6081,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return TotpChangePasswordSessionImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  UserPassword
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return UserPasswordImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -6190,6 +6474,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    CryptoKey self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as CryptoKeyImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     HealthClient self,
     SseSerializer serializer,
@@ -6236,19 +6533,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as LoginWithPasstotpFlowImpl).frbInternalSseEncode(move: true),
-      serializer,
-    );
-  }
-
-  @protected
-  void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    MasterKey self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MasterKeyImpl).frbInternalSseEncode(move: true),
       serializer,
     );
   }
@@ -6365,6 +6649,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    UserPassword self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as UserPasswordImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVaultClient(
     VaultClient self,
     SseSerializer serializer,
@@ -6378,13 +6675,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
-  sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    MasterKey self,
+  sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    CryptoKey self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
-      (self as MasterKeyImpl).frbInternalSseEncode(move: false),
+      (self as CryptoKeyImpl).frbInternalSseEncode(move: false),
       serializer,
     );
   }
@@ -6484,6 +6781,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    CryptoKey self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as CryptoKeyImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     HealthClient self,
     SseSerializer serializer,
@@ -6530,19 +6840,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as LoginWithPasstotpFlowImpl).frbInternalSseEncode(move: false),
-      serializer,
-    );
-  }
-
-  @protected
-  void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    MasterKey self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MasterKeyImpl).frbInternalSseEncode(move: false),
       serializer,
     );
   }
@@ -6711,6 +7008,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCryptoKey(
+    CryptoKey self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as CryptoKeyImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHealthClient(
     HealthClient self,
     SseSerializer serializer,
@@ -6757,19 +7067,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as LoginWithPasstotpFlowImpl).frbInternalSseEncode(move: null),
-      serializer,
-    );
-  }
-
-  @protected
-  void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMasterKey(
-    MasterKey self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MasterKeyImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -6880,6 +7177,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as TotpChangePasswordSessionImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerUserPassword(
+    UserPassword self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as UserPasswordImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -7217,12 +7527,12 @@ class AccountClientImpl extends RustOpaque implements AccountClient {
 
   Future<PasswordDeleteSession> deleteWithPasstotpStep1({
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsAccountClientAccountClientDeleteWithPasstotpStep1(
         that: this,
         accessToken: accessToken,
-        masterKey: masterKey,
+        cryptoKey: cryptoKey,
       );
 
   Future<void> deleteWithPasstotpStep2({
@@ -7263,6 +7573,9 @@ class BlobImpl extends RustOpaque implements Blob {
         RustLib.instance.api.rust_arc_decrement_strong_count_BlobPtr,
   );
 
+  Future<Uint8List> authenticationTag() =>
+      RustLib.instance.api.crateApiTypesBlobBlobAuthenticationTag(that: this);
+
   Future<Uint8List> encryptedBytes() =>
       RustLib.instance.api.crateApiTypesBlobBlobEncryptedBytes(that: this);
 
@@ -7295,20 +7608,38 @@ class CryptoClientImpl extends RustOpaque implements CryptoClient {
         RustLib.instance.api.rust_arc_decrement_strong_count_CryptoClientPtr,
   );
 
-  Future<TbsBlob> decrypt({required MasterKey masterKey, required Blob blob}) =>
+  Future<TbsBlob> decrypt({required CryptoKey cryptoKey, required Blob blob}) =>
       RustLib.instance.api.crateApiClientsCryptoClientCryptoClientDecrypt(
         that: this,
-        masterKey: masterKey,
+        cryptoKey: cryptoKey,
         blob: blob,
       );
 
+  Future<Keys> decryptKeys({
+    required CryptoKey cryptoKey,
+    required Blob blob,
+  }) => RustLib.instance.api.crateApiClientsCryptoClientCryptoClientDecryptKeys(
+    that: this,
+    cryptoKey: cryptoKey,
+    blob: blob,
+  );
+
   Future<Blob> encrypt({
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
     required TbsBlob tbsBlob,
   }) => RustLib.instance.api.crateApiClientsCryptoClientCryptoClientEncrypt(
     that: this,
-    masterKey: masterKey,
+    cryptoKey: cryptoKey,
     tbsBlob: tbsBlob,
+  );
+
+  Future<Blob> encryptKeys({
+    required CryptoKey cryptoKey,
+    required Keys keys,
+  }) => RustLib.instance.api.crateApiClientsCryptoClientCryptoClientEncryptKeys(
+    that: this,
+    cryptoKey: cryptoKey,
+    keys: keys,
   );
 
   Future<Keys> parseKeys({required List<int> encoded}) =>
@@ -7336,6 +7667,32 @@ class CryptoClientImpl extends RustOpaque implements CryptoClient {
         that: this,
         tbsBlob: tbsBlob,
       );
+}
+
+@sealed
+class CryptoKeyImpl extends RustOpaque implements CryptoKey {
+  // Not to be used by end users
+  CryptoKeyImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  CryptoKeyImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_CryptoKey,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_CryptoKey,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_CryptoKeyPtr,
+  );
+
+  Future<String> fingerprint() => RustLib.instance.api
+      .crateApiTypesMasterKeyCryptoKeyFingerprint(that: this);
+
+  Future<void> zeroize() =>
+      RustLib.instance.api.crateApiTypesMasterKeyCryptoKeyZeroize(that: this);
 }
 
 @sealed
@@ -7436,12 +7793,12 @@ class LoginWithPasstotpClientImpl extends RustOpaque
 
   Future<LoginWithPasstotpFlow> step1({
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsAuthClientLoginWithPasstotpClientStep1(
         that: this,
         username: username,
-        masterKey: masterKey,
+        cryptoKey: cryptoKey,
       );
 
   Future<(String, String)> step2({
@@ -7485,32 +7842,6 @@ class LoginWithPasstotpFlowImpl extends RustOpaque
 
   Future<String> operationId() => RustLib.instance.api
       .crateApiTypesFlowsLoginWithPasstotpFlowOperationId(that: this);
-}
-
-@sealed
-class MasterKeyImpl extends RustOpaque implements MasterKey {
-  // Not to be used by end users
-  MasterKeyImpl.frbInternalDcoDecode(List<dynamic> wire)
-    : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  MasterKeyImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_MasterKey,
-    rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MasterKey,
-    rustArcDecrementStrongCountPtr:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MasterKeyPtr,
-  );
-
-  Future<String> fingerprint() => RustLib.instance.api
-      .crateApiTypesMasterKeyMasterKeyFingerprint(that: this);
-
-  Future<void> zeroize() =>
-      RustLib.instance.api.crateApiTypesMasterKeyMasterKeyZeroize(that: this);
 }
 
 @sealed
@@ -7644,12 +7975,12 @@ class RegistrationWithPasstotpClientImpl extends RustOpaque
 
   Future<RegistrationWithPasstotpFlow> step1({
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsAuthClientRegistrationWithPasstotpClientStep1(
         that: this,
         username: username,
-        masterKey: masterKey,
+        cryptoKey: cryptoKey,
       );
 
   Future<(String, String)> step2({
@@ -7740,12 +8071,12 @@ class SecurityClientImpl extends RustOpaque implements SecurityClient {
 
   Future<PasswordChangePasskeySession> changePasswordWithPasskeyStep1({
     required String accessToken,
-    required MasterKey newMasterKey,
+    required CryptoKey newCryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsSecurityClientSecurityClientChangePasswordWithPasskeyStep1(
         that: this,
         accessToken: accessToken,
-        newMasterKey: newMasterKey,
+        newCryptoKey: newCryptoKey,
       );
 
   Future<void> changePasswordWithPasskeyStep2({
@@ -7762,14 +8093,14 @@ class SecurityClientImpl extends RustOpaque implements SecurityClient {
 
   Future<PasswordChangeTotpSession> changePasswordWithTotpStep1({
     required String accessToken,
-    required MasterKey currentMasterKey,
-    required MasterKey newMasterKey,
+    required CryptoKey currentCryptoKey,
+    required CryptoKey newCryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsSecurityClientSecurityClientChangePasswordWithTotpStep1(
         that: this,
         accessToken: accessToken,
-        currentMasterKey: currentMasterKey,
-        newMasterKey: newMasterKey,
+        currentCryptoKey: currentCryptoKey,
+        newCryptoKey: newCryptoKey,
       );
 
   Future<void> changePasswordWithTotpStep2({
@@ -7808,12 +8139,12 @@ class SecurityClientImpl extends RustOpaque implements SecurityClient {
 
   Future<TotpChangePasswordSession> changeTotpWithPasswordStep1({
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   }) => RustLib.instance.api
       .crateApiClientsSecurityClientSecurityClientChangeTotpWithPasswordStep1(
         that: this,
         accessToken: accessToken,
-        masterKey: masterKey,
+        cryptoKey: cryptoKey,
       );
 
   Future<void> changeTotpWithPasswordStep2({
@@ -7937,6 +8268,26 @@ class TotpChangePasswordSessionImpl extends RustOpaque
 
   Future<String> totpUrl() => RustLib.instance.api
       .crateApiTypesFlowsTotpChangePasswordSessionTotpUrl(that: this);
+}
+
+@sealed
+class UserPasswordImpl extends RustOpaque implements UserPassword {
+  // Not to be used by end users
+  UserPasswordImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  UserPasswordImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_UserPassword,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_UserPassword,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_UserPasswordPtr,
+  );
 }
 
 @sealed

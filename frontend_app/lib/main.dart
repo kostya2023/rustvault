@@ -1,8 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:frontend_app/rust/api/clients/crypto_client.dart';
+import 'package:frontend_app/rust/api/types/crypto.dart';
 import 'package:frontend_app/rust/api/types/master_key.dart';
 import 'package:frontend_app/rust/frb_generated.dart';
+
+const _blobSaltOffset = 16;
+const _blobSaltLength = 32;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,19 +27,19 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MasterKeyPage(),
+      home: const CryptoKeyPage(),
     );
   }
 }
 
-class MasterKeyPage extends StatefulWidget {
-  const MasterKeyPage({super.key});
+class CryptoKeyPage extends StatefulWidget {
+  const CryptoKeyPage({super.key});
 
   @override
-  State<MasterKeyPage> createState() => _MasterKeyPageState();
+  State<CryptoKeyPage> createState() => _CryptoKeyPageState();
 }
 
-class _MasterKeyPageState extends State<MasterKeyPage> {
+class _CryptoKeyPageState extends State<CryptoKeyPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -44,17 +47,19 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
   bool _obscurePassword = true;
 
   String? _fingerprint;
+  String? _salt;
   String? _error;
   Duration? _elapsed;
 
-  Future<void> _createMasterKey() async {
-    final username = _usernameController.text;
+  Future<void> _generateSalt() async {
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
     if (username.isEmpty || password.isEmpty) {
       setState(() {
         _error = 'Username and password are required.';
         _fingerprint = null;
+        _salt = null;
         _elapsed = null;
       });
       return;
@@ -63,21 +68,36 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
     setState(() {
       _isLoading = true;
       _fingerprint = null;
+      _salt = null;
       _error = null;
       _elapsed = null;
     });
 
     final stopwatch = Stopwatch()..start();
 
-    MasterKey? masterKey;
+    CryptoKey? cryptoKey;
 
     try {
-      masterKey = await MasterKey.newInstance(
-        username: utf8.encode(username),
-        password: utf8.encode(password),
+      final userPassword = await UserPassword.newInstance(password: password);
+      cryptoKey = await CryptoKey.fromUserPassword(
+        userPassword: userPassword,
+        username: username,
       );
 
-      final fingerprint = await masterKey.fingerprint();
+      final fingerprint = await cryptoKey.fingerprint();
+      final cryptoClient = await CryptoClient.newInstance();
+      final encryptedBlob = await cryptoClient.encryptKeys(
+        cryptoKey: cryptoKey,
+        keys: const Keys(keys: []),
+      );
+      final encryptedBytes = await encryptedBlob.encryptedBytes();
+      if (encryptedBytes.length < _blobSaltOffset + _blobSaltLength) {
+        throw StateError('Generated blob does not contain a complete salt.');
+      }
+      final salt = encryptedBytes
+          .sublist(_blobSaltOffset, _blobSaltOffset + _blobSaltLength)
+          .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+          .join();
 
       stopwatch.stop();
 
@@ -85,6 +105,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
 
       setState(() {
         _fingerprint = fingerprint;
+        _salt = salt;
         _elapsed = stopwatch.elapsed;
       });
     } catch (e) {
@@ -97,9 +118,9 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
         _elapsed = stopwatch.elapsed;
       });
     } finally {
-      if (masterKey != null) {
+      if (cryptoKey != null) {
         try {
-          await masterKey.zeroize();
+          await cryptoKey.zeroize();
         } catch (_) {
           // Ignore zeroization errors during cleanup.
         }
@@ -126,7 +147,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('RustVault MasterKey'),
+        title: const Text('RustVault CryptoKey'),
         centerTitle: true,
       ),
       body: Center(
@@ -142,7 +163,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                 const SizedBox(height: 16),
 
                 Text(
-                  'MasterKey Generator',
+                  'CryptoKey Generator',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -152,7 +173,8 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                 const SizedBox(height: 8),
 
                 Text(
-                  'Generate your RustVault MasterKey using Argon2id.',
+                  'Create a CryptoKey from your username and password. '
+                  'Generating a salt runs Argon2id for a new blob.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -181,7 +203,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) {
                     if (!_isLoading) {
-                      _createMasterKey();
+                      _generateSalt();
                     }
                   },
                   decoration: InputDecoration(
@@ -208,7 +230,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                 SizedBox(
                   height: 52,
                   child: FilledButton(
-                    onPressed: _isLoading ? null : _createMasterKey,
+                    onPressed: _isLoading ? null : _generateSalt,
                     child: _isLoading
                         ? const SizedBox(
                             width: 24,
@@ -216,7 +238,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                             child: CircularProgressIndicator(strokeWidth: 2.5),
                           )
                         : const Text(
-                            'Create MasterKey',
+                            'Generate salt',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -271,7 +293,7 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                               const Icon(Icons.fingerprint, size: 28),
                               const SizedBox(width: 8),
                               Text(
-                                'MasterKey Fingerprint',
+                                'CryptoKey Fingerprint',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -287,6 +309,21 @@ class _MasterKeyPageState extends State<MasterKeyPage> {
                               fontFamily: 'monospace',
                               fontSize: 16,
                               letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Blob salt (32 bytes)',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 8),
+                          SelectableText(
+                            _salt!,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              height: 1.5,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],

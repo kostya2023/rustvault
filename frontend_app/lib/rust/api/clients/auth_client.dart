@@ -65,7 +65,7 @@ abstract class LoginWithPasstotpClient implements RustOpaqueInterface {
 
   Future<LoginWithPasstotpFlow> step1({
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<(String, String)> step2({
@@ -107,7 +107,7 @@ abstract class RegistrationWithPasstotpClient implements RustOpaqueInterface {
 
   Future<RegistrationWithPasstotpFlow> step1({
     required String username,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<(String, String)> step2({

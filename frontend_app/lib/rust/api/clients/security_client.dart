@@ -26,7 +26,7 @@ abstract class SecurityClient implements RustOpaqueInterface {
 
   Future<PasswordChangePasskeySession> changePasswordWithPasskeyStep1({
     required String accessToken,
-    required MasterKey newMasterKey,
+    required CryptoKey newCryptoKey,
   });
 
   Future<void> changePasswordWithPasskeyStep2({
@@ -37,8 +37,8 @@ abstract class SecurityClient implements RustOpaqueInterface {
 
   Future<PasswordChangeTotpSession> changePasswordWithTotpStep1({
     required String accessToken,
-    required MasterKey currentMasterKey,
-    required MasterKey newMasterKey,
+    required CryptoKey currentCryptoKey,
+    required CryptoKey newCryptoKey,
   });
 
   Future<void> changePasswordWithTotpStep2({
@@ -60,7 +60,7 @@ abstract class SecurityClient implements RustOpaqueInterface {
 
   Future<TotpChangePasswordSession> changeTotpWithPasswordStep1({
     required String accessToken,
-    required MasterKey masterKey,
+    required CryptoKey cryptoKey,
   });
 
   Future<void> changeTotpWithPasswordStep2({

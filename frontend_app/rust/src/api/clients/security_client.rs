@@ -8,7 +8,7 @@ use crate::{
                 PasswordChangePasskeySession, PasswordChangeTotpSession,
                 TotpChangePasswordSession,
             },
-            master_key::MasterKey,
+            master_key::CryptoKey,
             security::{
                 DeletePasskeyChallenge, PasskeyChallenge, PasskeyInfo, SecurityEvent,
                 SecurityEventsPage, TotpChangeChallenge,
@@ -288,9 +288,9 @@ impl SecurityClient {
     pub async fn change_password_with_passkey_step1(
         &self,
         access_token: String,
-        new_master_key: &MasterKey,
+        new_crypto_key: &CryptoKey,
     ) -> Result<PasswordChangePasskeySession, SdkError> {
-        let password = new_master_key.opaque_password();
+        let password = new_crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let start = ClientRegistration::<OpaqueCipherSuite>::start(&mut rng, &password)
             .map_err(|error| {
@@ -360,11 +360,11 @@ impl SecurityClient {
     pub async fn change_password_with_totp_step1(
         &self,
         access_token: String,
-        current_master_key: &MasterKey,
-        new_master_key: &MasterKey,
+        current_crypto_key: &CryptoKey,
+        new_crypto_key: &CryptoKey,
     ) -> Result<PasswordChangeTotpSession, SdkError> {
-        let current_password = current_master_key.opaque_password();
-        let new_password = new_master_key.opaque_password();
+        let current_password = current_crypto_key.user_password_bytes();
+        let new_password = new_crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let login = ClientLogin::<OpaqueCipherSuite>::start(&mut rng, &current_password)
             .map_err(|error| SdkError::Internal(format!("OPAQUE login failed: {error}")))?;
@@ -508,9 +508,9 @@ impl SecurityClient {
     pub async fn change_totp_with_password_step1(
         &self,
         access_token: String,
-        master_key: &MasterKey,
+        crypto_key: &CryptoKey,
     ) -> Result<TotpChangePasswordSession, SdkError> {
-        let password = master_key.opaque_password();
+        let password = crypto_key.user_password_bytes();
         let mut rng = OsRng;
         let login = ClientLogin::<OpaqueCipherSuite>::start(&mut rng, &password)
             .map_err(|error| SdkError::Internal(format!("OPAQUE login failed: {error}")))?;

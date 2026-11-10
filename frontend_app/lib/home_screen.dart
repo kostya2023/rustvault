@@ -739,8 +739,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF18181B),
           title: const Text('Выберите записи для конфликтов'),
-          content: SizedBox(
-            width: 520,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1303,15 +1303,81 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPasswordActions({
+    required int index,
+    required PasswordItem item,
+    required bool isVisible,
+    required bool compact,
+  }) {
+    final constraints = compact
+        ? const BoxConstraints.tightFor(width: 36, height: 36)
+        : null;
+    final padding = compact ? EdgeInsets.zero : null;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          constraints: constraints,
+          padding: padding,
+          tooltip: isVisible ? 'Скрыть пароль' : 'Показать пароль',
+          icon: Icon(
+            isVisible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            size: 16,
+            color: const Color(0xFF3B82F6),
+          ),
+          onPressed: () =>
+              setState(() => _showPasswordList[index] = !isVisible),
+        ),
+        IconButton(
+          constraints: constraints,
+          padding: padding,
+          tooltip: 'Скопировать пароль',
+          icon: const Icon(
+            Icons.copy_outlined,
+            size: 16,
+            color: Color(0xFF3B82F6),
+          ),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: item.password));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('📋 Пароль скопирован!'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          },
+        ),
+        IconButton(
+          constraints: constraints,
+          padding: padding,
+          tooltip: 'Удалить пароль',
+          icon: const Icon(
+            Icons.delete_outline,
+            size: 16,
+            color: Color(0xFFEF4444),
+          ),
+          onPressed: () => _deletePassword(index),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isPhoneWidth = MediaQuery.sizeOf(context).width < 600;
     return Scaffold(
       backgroundColor: const Color(0xFF09090E),
       body: SafeArea(
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              padding: EdgeInsets.symmetric(
+                horizontal: isPhoneWidth ? 12 : 24,
+                vertical: 14,
+              ),
               decoration: const BoxDecoration(
                 color: Color(0xFF101016),
                 border: Border(
@@ -1337,10 +1403,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     'RustVault',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: isPhoneWidth ? 16 : 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFFAFAFA),
                     ),
@@ -1356,11 +1422,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Сохранение…',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                    ),
-                    const SizedBox(width: 12),
+                    if (!isPhoneWidth)
+                      const Text(
+                        'Сохранение…',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    SizedBox(width: isPhoneWidth ? 4 : 12),
                   ],
                   GestureDetector(
                     onTap: _showProfileDialog,
@@ -1382,12 +1452,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Color(0xFF3B82F6),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            widget.username,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFFAFAFA),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: isPhoneWidth ? 96 : 180,
+                            ),
+                            child: Text(
+                              widget.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFFAFAFA),
+                              ),
                             ),
                           ),
                           const Icon(
@@ -1404,9 +1481,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 20,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhoneWidth ? 12 : 24,
+                  vertical: isPhoneWidth ? 12 : 20,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1524,17 +1601,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           '🔐 Мои пароли',
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: isPhoneWidth ? 18 : 20,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFAFAFA),
                           ),
                         ),
-                        const Spacer(),
                         IconButton(
                           tooltip: 'Синхронизировать с сервером',
                           onPressed:
@@ -1558,7 +1637,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   color: Color(0xFF3B82F6),
                                 ),
                         ),
-                        const SizedBox(width: 8),
                         ElevatedButton.icon(
                           onPressed:
                               (widget.cryptoKey == null ||
@@ -1616,110 +1694,147 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: const Color(0xFF1E293B),
                                         ),
                                       ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            flex: 2,
-                                            child: Column(
+                                      child: isPhoneWidth
+                                          ? Column(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                                  CrossAxisAlignment.stretch,
                                               children: [
-                                                Text(
-                                                  item.title,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(0xFFFAFAFA),
-                                                  ),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            item.title,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Color(
+                                                                    0xFFFAFAFA,
+                                                                  ),
+                                                                ),
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 2,
+                                                          ),
+                                                          Text(
+                                                            item.login,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: Color(
+                                                                    0xFF94A3B8,
+                                                                  ),
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    _buildPasswordActions(
+                                                      index: index,
+                                                      item: item,
+                                                      isVisible: isVisible,
+                                                      compact: true,
+                                                    ),
+                                                  ],
                                                 ),
-                                                const SizedBox(height: 2),
+                                                const SizedBox(height: 6),
                                                 Text(
-                                                  item.login,
-                                                  style: const TextStyle(
+                                                  isVisible
+                                                      ? item.password
+                                                      : '••••••••••••••••',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Color(0xFF94A3B8),
+                                                    fontFamily: isVisible
+                                                        ? 'monospace'
+                                                        : null,
+                                                    color: const Color(
+                                                      0xFFCBD5E1,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
-                                            ),
-                                          ),
-                                          Expanded(
-                                            flex: 3,
-                                            child: Row(
+                                            )
+                                          : Row(
                                               children: [
                                                 Expanded(
-                                                  child: Text(
-                                                    isVisible
-                                                        ? item.password
-                                                        : '••••••••••••••••',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontFamily: isVisible
-                                                          ? 'monospace'
-                                                          : null,
-                                                      color: const Color(
-                                                        0xFFCBD5E1,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: Icon(
-                                                    isVisible
-                                                        ? Icons
-                                                              .visibility_off_outlined
-                                                        : Icons
-                                                              .visibility_outlined,
-                                                    size: 16,
-                                                    color: const Color(
-                                                      0xFF3B82F6,
-                                                    ),
-                                                  ),
-                                                  onPressed: () => setState(
-                                                    () =>
-                                                        _showPasswordList[index] =
-                                                            !isVisible,
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.copy_outlined,
-                                                    size: 16,
-                                                    color: Color(0xFF3B82F6),
-                                                  ),
-                                                  onPressed: () {
-                                                    Clipboard.setData(
-                                                      ClipboardData(
-                                                        text: item.password,
-                                                      ),
-                                                    );
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          '📋 Пароль скопирован!',
-                                                        ),
-                                                        duration: Duration(
-                                                          seconds: 1,
+                                                  flex: 2,
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        item.title,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Color(
+                                                            0xFFFAFAFA,
+                                                          ),
                                                         ),
                                                       ),
-                                                    );
-                                                  },
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                    size: 16,
-                                                    color: Color(0xFFEF4444),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        item.login,
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: Color(
+                                                            0xFF94A3B8,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  onPressed: () =>
-                                                      _deletePassword(index),
+                                                ),
+                                                Expanded(
+                                                  flex: 3,
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          isVisible
+                                                              ? item.password
+                                                              : '••••••••••••••••',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontFamily:
+                                                                isVisible
+                                                                ? 'monospace'
+                                                                : null,
+                                                            color: const Color(
+                                                              0xFFCBD5E1,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      _buildPasswordActions(
+                                                        index: index,
+                                                        item: item,
+                                                        isVisible: isVisible,
+                                                        compact: false,
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ],
                                             ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   );
                                 },

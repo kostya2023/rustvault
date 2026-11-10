@@ -489,187 +489,195 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+    final isPhoneWidth = screenSize.width < 600;
+    final dialogHeight = screenSize.height * 0.82;
     return Dialog(
       backgroundColor: const Color(0xFF14141A),
-      child: SizedBox(
-        width: 540,
-        height: MediaQuery.sizeOf(context).height * 0.82,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.manage_accounts, color: Color(0xFF60A5FA)),
-                  const SizedBox(width: 10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: SizedBox(
+          width: double.infinity,
+          height: dialogHeight,
+          child: Padding(
+            padding: EdgeInsets.all(isPhoneWidth ? 12 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.manage_accounts, color: Color(0xFF60A5FA)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Управление аккаунтом',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Обновить',
+                      onPressed: _isLoading || _isBusy ? null : _loadData,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                    if (_isLoading || _isLoadingMoreEvents) ...[
+                      const SizedBox(width: 8),
+                      const OperationStopwatch(running: true),
+                    ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const Divider(color: Color(0xFF27272A)),
+                if (_isLoading)
                   const Expanded(
-                    child: Text(
-                      'Управление аккаунтом',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_loadError != null)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Не удалось загрузить данные аккаунта:\n$_loadError',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: _loadData,
+                            child: const Text('Повторить'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Passkeys',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _isBusy ? null : _registerPasskey,
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('Добавить'),
+                              ),
+                            ],
+                          ),
+                          if (_passkeys.isEmpty)
+                            const _EmptySection('Passkey ещё не добавлены.')
+                          else
+                            ..._passkeys.map(
+                              (passkey) => _PasskeyTile(
+                                passkey: passkey,
+                                credentialShort: _shortCredentialId(
+                                  passkey.credentialId,
+                                ),
+                                onDelete: _isBusy
+                                    ? null
+                                    : () => _deletePasskey(passkey),
+                              ),
+                            ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'История событий',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${_events.length}',
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_events.isEmpty)
+                            const _EmptySection('Событий нет.')
+                          else
+                            ..._events.map(
+                              (event) => _EventTile(
+                                event: event,
+                                title: _eventTypeName(event.eventType),
+                              ),
+                            ),
+                          if (_events.length >= 50)
+                            Align(
+                              alignment: Alignment.center,
+                              child: TextButton(
+                                onPressed: _isLoadingMoreEvents
+                                    ? null
+                                    : _loadMoreEvents,
+                                child: _isLoadingMoreEvents
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Загрузить ещё события'),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Обновить',
-                    onPressed: _isLoading || _isBusy ? null : _loadData,
-                    icon: const Icon(Icons.refresh),
+                if (_isBusy) ...[
+                  Row(
+                    children: [
+                      const Expanded(child: LinearProgressIndicator()),
+                      const SizedBox(width: 10),
+                      const OperationStopwatch(running: true),
+                    ],
                   ),
-                  if (_isLoading || _isLoadingMoreEvents) ...[
-                    const SizedBox(width: 8),
-                    const OperationStopwatch(running: true),
-                  ],
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const Divider(color: Color(0xFF27272A)),
-              if (_isLoading)
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_loadError != null)
-                Expanded(
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Не удалось загрузить данные аккаунта:\n$_loadError',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: _loadData,
-                          child: const Text('Повторить'),
-                        ),
-                      ],
+                  if (_busyStatus != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _busyStatus!,
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Passkeys',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: _isBusy ? null : _registerPasskey,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Добавить'),
-                            ),
-                          ],
-                        ),
-                        if (_passkeys.isEmpty)
-                          const _EmptySection('Passkey ещё не добавлены.')
-                        else
-                          ..._passkeys.map(
-                            (passkey) => _PasskeyTile(
-                              passkey: passkey,
-                              credentialShort: _shortCredentialId(
-                                passkey.credentialId,
-                              ),
-                              onDelete: _isBusy
-                                  ? null
-                                  : () => _deletePasskey(passkey),
-                            ),
-                          ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'История событий',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${_events.length}',
-                              style: const TextStyle(color: Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
-                        if (_events.isEmpty)
-                          const _EmptySection('Событий нет.')
-                        else
-                          ..._events.map(
-                            (event) => _EventTile(
-                              event: event,
-                              title: _eventTypeName(event.eventType),
-                            ),
-                          ),
-                        if (_events.length >= 50)
-                          Align(
-                            alignment: Alignment.center,
-                            child: TextButton(
-                              onPressed: _isLoadingMoreEvents
-                                  ? null
-                                  : _loadMoreEvents,
-                              child: _isLoadingMoreEvents
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Загрузить ещё события'),
-                            ),
-                          ),
-                      ],
+                  ],
+                ],
+                const Divider(color: Color(0xFF27272A)),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _isBusy ? null : _deleteAccount,
+                    icon: const Icon(Icons.delete_forever, color: Colors.red),
+                    label: const Text(
+                      'Удалить аккаунт',
+                      style: TextStyle(color: Colors.red),
                     ),
                   ),
                 ),
-              if (_isBusy) ...[
-                Row(
-                  children: [
-                    const Expanded(child: LinearProgressIndicator()),
-                    const SizedBox(width: 10),
-                    const OperationStopwatch(running: true),
-                  ],
-                ),
-                if (_busyStatus != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _busyStatus!,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
               ],
-              const Divider(color: Color(0xFF27272A)),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: _isBusy ? null : _deleteAccount,
-                  icon: const Icon(Icons.delete_forever, color: Colors.red),
-                  label: const Text(
-                    'Удалить аккаунт',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

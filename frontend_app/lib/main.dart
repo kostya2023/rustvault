@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webauthn_secure_storage/webauthn_secure_storage.dart';
@@ -14,12 +12,15 @@ import 'services/webauthn_options.dart';
 import 'services/passkey_executor.dart';
 import 'services/totp_code.dart';
 import 'widgets/operation_stopwatch.dart';
+import 'widgets/debug_api_menu.dart';
 import 'rust/frb_generated.dart';
-import 'rust/api/clients/auth_client.dart';
 import 'rust/api/types/master_key.dart';
 import 'rust/api/types/security.dart';
 
 import 'home_screen.dart';
+
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,13 +36,35 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _rootNavigatorKey,
+      scaffoldMessengerKey: _rootScaffoldMessengerKey,
       title: 'RustPass Manager',
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
+        final compact = MediaQuery.sizeOf(context).width < 600;
+        final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
         return MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.noScaling),
-          child: child!,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              child!,
+              Positioned(
+                left: 12,
+                bottom: keyboardInset > 0 ? keyboardInset + 8 : 12,
+                child: SafeArea(
+                  top: false,
+                  right: true,
+                  child: DebugApiMenu(
+                    compact: compact,
+                    navigatorKey: _rootNavigatorKey,
+                    scaffoldMessengerKey: _rootScaffoldMessengerKey,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
       theme: ThemeData(
@@ -77,8 +100,6 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   String _authStatus = '';
 
-  late String baseUrl = AuthService().baseUrl;
-
   void _setAuthStatus(String status) {
     if (mounted) setState(() => _authStatus = status);
   }
@@ -89,135 +110,6 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _showDebugConfigDialog() async {
-    final TextEditingController urlController = TextEditingController(
-      text: baseUrl,
-    );
-    Uint8List? selectedCert = AuthService().sslCaPinnedCert;
-    String? selectedCertPath = AuthService().sslCaPinnedCertPath;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            backgroundColor: const Color(0xFF18181B),
-            title: const Text(
-              '⚙️ Настройка Debug Server',
-              style: TextStyle(fontSize: 16),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Укажите адрес API и при необходимости выберите CA-сертификат для всех запросов.',
-                  style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: urlController,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  decoration: _inputDecoration(
-                    'Base URL (например, https://vault.example:8443)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    try {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: const ['pem', 'crt', 'cer', 'der'],
-                        withData: true,
-                      );
-                      if (result == null) return;
-                      final file = result.files.single;
-                      final bytes = file.bytes;
-                      if (bytes == null || bytes.isEmpty) {
-                        throw StateError(
-                          'Файл сертификата пуст или недоступен.',
-                        );
-                      }
-                      setDialogState(() {
-                        selectedCert = bytes;
-                        selectedCertPath = file.name;
-                      });
-                    } catch (error) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Не удалось прочитать CA: $error'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.upload_file, size: 18),
-                  label: Text(
-                    selectedCertPath == null
-                        ? 'Выбрать SSL CA pinned cert'
-                        : 'Сертификат: $selectedCertPath',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (selectedCert != null)
-                  TextButton(
-                    onPressed: () => setDialogState(() {
-                      selectedCert = null;
-                      selectedCertPath = null;
-                    }),
-                    child: const Text('Убрать CA-сертификат'),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Отмена',
-                  style: TextStyle(color: Color(0xFF71717A)),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFAFAFA),
-                  foregroundColor: Colors.black,
-                ),
-                onPressed: () {
-                  final url = urlController.text.trim();
-                  final parsedUrl = Uri.tryParse(url);
-                  if (parsedUrl == null ||
-                      !parsedUrl.hasAuthority ||
-                      !const ['http', 'https'].contains(parsedUrl.scheme)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Введите корректный HTTP(S) Base URL.'),
-                      ),
-                    );
-                    return;
-                  }
-                  setState(() => baseUrl = url);
-                  AuthService()
-                    ..baseUrl = url
-                    ..setSslCaPinnedCert(selectedCert, path: selectedCertPath);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Debug API настроен: $url'),
-                      backgroundColor: const Color(0xFF10B981),
-                    ),
-                  );
-                },
-                child: const Text('Сохранить'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    urlController.dispose();
   }
 
   Future<void> _submitForm() async {
@@ -283,12 +175,8 @@ class _AuthScreenState extends State<AuthScreen> {
         username: username,
       );
 
-      AuthService().baseUrl = baseUrl;
       _setAuthStatus('Получение challenge Passkey…');
-      final client = await LoginWithPasskeyClient.withBaseUrlAndRootOfTrust(
-        baseUrl: baseUrl,
-        sslCaPinnedCert: AuthService().sslCaPinnedCert,
-      );
+      final client = await AuthService().createLoginWithPasskeyClient();
       final PasskeyChallenge challenge = await client.step1(username: username);
 
       _setAuthStatus('Ожидание подтверждения Passkey…');
@@ -311,7 +199,7 @@ class _AuthScreenState extends State<AuthScreen> {
       final accountClient = await AuthService().createAccountClient();
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
-      AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
+      AuthService().saveTokens(tokens.$1, tokens.$2);
 
       if (mounted) {
         final CryptoKey vaultCryptoKey = cryptoKey;
@@ -391,11 +279,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       _setAuthStatus('Проверка учётных данных…');
-      AuthService().baseUrl = baseUrl;
-      final client = await LoginWithPasstotpClient.withBaseUrlAndRootOfTrust(
-        baseUrl: baseUrl,
-        sslCaPinnedCert: AuthService().sslCaPinnedCert,
-      );
+      final client = await AuthService().createLoginWithPasstotpClient();
 
       // Шаг 1: Получаем flow
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
@@ -422,7 +306,7 @@ class _AuthScreenState extends State<AuthScreen> {
       final accountClient = await AuthService().createAccountClient();
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
-      AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
+      AuthService().saveTokens(tokens.$1, tokens.$2);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -461,13 +345,8 @@ class _AuthScreenState extends State<AuthScreen> {
     );
 
     try {
-      AuthService().baseUrl = baseUrl;
       _setAuthStatus('Создание учётной записи…');
-      final client =
-          await RegistrationWithPasstotpClient.withBaseUrlAndRootOfTrust(
-            baseUrl: baseUrl,
-            sslCaPinnedCert: AuthService().sslCaPinnedCert,
-          );
+      final client = await AuthService().createRegistrationClient();
 
       // Шаг 1 регистрации
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
@@ -489,11 +368,8 @@ class _AuthScreenState extends State<AuthScreen> {
       // Шаг 2 регистрации с проверочным кодом
       final tokens = await client.step2(flow: flow, totpCode: totpCode);
 
-      _setAuthStatus('Загрузка профиля аккаунта…');
-      final accountClient = await AuthService().createAccountClient();
-      final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
-
-      AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
+      _setAuthStatus('Завершение регистрации…');
+      AuthService().saveTokens(tokens.$1, tokens.$2);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -506,7 +382,7 @@ class _AuthScreenState extends State<AuthScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => HomeScreen(
-              username: accountInfo.username,
+              username: username,
               cryptoKey: cryptoKey,
               accessToken: tokens.$1,
             ),
@@ -561,118 +437,129 @@ class _AuthScreenState extends State<AuthScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
+        final qrSize = MediaQuery.sizeOf(context).width < 400 ? 140.0 : 180.0;
         return Dialog(
           backgroundColor: const Color(0xFF18181B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: SizedBox(
-            width: 360,
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Настройка двухфакторной аутентификации',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Отсканируйте этот QR-код в приложении аутентификации:',
-                      style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: EdgeInsets.all(
+                  MediaQuery.sizeOf(context).width < 400 ? 16 : 24,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Настройка двухфакторной аутентификации',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: SizedBox(
-                          width: 180,
-                          height: 180,
-                          child: QrImageView(
-                            data: totpUri,
-                            version: QrVersions.auto,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Отсканируйте этот QR-код в приложении аутентификации:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFA1A1AA),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SizedBox(
+                            width: qrSize,
+                            height: qrSize,
+                            child: QrImageView(
+                              data: totpUri,
+                              version: QrVersions.auto,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: TextButton(
-                        onPressed: openTotpLink,
-                        child: const Text(
-                          'Если не можете отсканировать, нажмите здесь',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFF60A5FA),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: codeController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 8,
-                      onSubmitted: (value) {
-                        final code = value.trim();
-                        if (isValidTotpCode(code)) {
-                          Navigator.pop(context, code);
-                        }
-                      },
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration(
-                        'Введите 8-значный код TOTP',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: TextButton(
+                          onPressed: openTotpLink,
                           child: const Text(
-                            'Отмена',
-                            style: TextStyle(color: Color(0xFF71717A)),
+                            'Если не можете отсканировать, нажмите здесь',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF60A5FA),
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFAFAFA),
-                            foregroundColor: Colors.black,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: codeController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        maxLength: 8,
+                        onSubmitted: (value) {
+                          final code = value.trim();
+                          if (isValidTotpCode(code)) {
+                            Navigator.pop(context, code);
+                          }
+                        },
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _inputDecoration(
+                          'Введите 8-значный код TOTP',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Отмена',
+                              style: TextStyle(color: Color(0xFF71717A)),
+                            ),
                           ),
-                          onPressed: () {
-                            final code = codeController.text.trim();
-                            if (isValidTotpCode(code)) {
-                              Navigator.pop(context, code);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    '⚠️ Код TOTP должен содержать ровно 8 цифр',
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFAFAFA),
+                              foregroundColor: Colors.black,
+                            ),
+                            onPressed: () {
+                              final code = codeController.text.trim();
+                              if (isValidTotpCode(code)) {
+                                Navigator.pop(context, code);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '⚠️ Код TOTP должен содержать ровно 8 цифр',
+                                    ),
+                                    backgroundColor: Color(0xFFEF4444),
                                   ),
-                                  backgroundColor: Color(0xFFEF4444),
-                                ),
-                              );
-                            }
-                          },
-                          child: const Text('Подтвердить'),
-                        ),
-                      ],
-                    ),
-                  ],
+                                );
+                              }
+                            },
+                            child: const Text('Подтвердить'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -753,8 +640,11 @@ class _AuthScreenState extends State<AuthScreen> {
           Center(
             child: SingleChildScrollView(
               child: Container(
-                width: 380,
-                padding: const EdgeInsets.all(32),
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 380),
+                padding: EdgeInsets.all(
+                  MediaQuery.sizeOf(context).width < 400 ? 20 : 32,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF121215),
                   borderRadius: BorderRadius.circular(12),
@@ -955,31 +845,6 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
           ),
-
-          if (kDebugMode)
-            Positioned(
-              bottom: 16,
-              left: 16,
-              child: FloatingActionButton.extended(
-                onPressed: _showDebugConfigDialog,
-                backgroundColor: const Color(0xFF18181B),
-                foregroundColor: const Color(0xFFA1A1AA),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Color(0xFF27272A)),
-                ),
-                icon: const Icon(
-                  Icons.bug_report,
-                  size: 16,
-                  color: Color(0xFF10B981),
-                ),
-                label: Text(
-                  'API: $baseUrl',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
         ],
       ),
     );

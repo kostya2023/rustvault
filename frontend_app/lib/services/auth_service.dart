@@ -3,12 +3,13 @@ import 'dart:typed_data';
 
 import '../rust/api/clients/account_client.dart';
 import '../rust/api/clients/auth_client.dart';
+import '../rust/api/clients/health_client.dart';
 import '../rust/api/clients/security_client.dart';
 import '../rust/api/clients/vault_client.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
-  factory AuthService() => AuthService._internal();
+  factory AuthService() => _instance;
   AuthService._internal();
 
   String? _accessToken;
@@ -36,6 +37,30 @@ class AuthService {
 
   Future<AccountClient> createAccountClient() =>
       AccountClient.withBaseUrlAndRootOfTrust(
+        baseUrl: _baseUrl,
+        sslCaPinnedCert: _sslCaPinnedCert,
+      );
+
+  Future<LoginWithPasstotpClient> createLoginWithPasstotpClient() =>
+      LoginWithPasstotpClient.withBaseUrlAndRootOfTrust(
+        baseUrl: _baseUrl,
+        sslCaPinnedCert: _sslCaPinnedCert,
+      );
+
+  Future<LoginWithPasskeyClient> createLoginWithPasskeyClient() =>
+      LoginWithPasskeyClient.withBaseUrlAndRootOfTrust(
+        baseUrl: _baseUrl,
+        sslCaPinnedCert: _sslCaPinnedCert,
+      );
+
+  Future<RegistrationWithPasstotpClient> createRegistrationClient() =>
+      RegistrationWithPasstotpClient.withBaseUrlAndRootOfTrust(
+        baseUrl: _baseUrl,
+        sslCaPinnedCert: _sslCaPinnedCert,
+      );
+
+  Future<HealthClient> createHealthClient() =>
+      HealthClient.withBaseUrlAndRootOfTrust(
         baseUrl: _baseUrl,
         sslCaPinnedCert: _sslCaPinnedCert,
       );

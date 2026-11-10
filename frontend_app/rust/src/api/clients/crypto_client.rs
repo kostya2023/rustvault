@@ -32,6 +32,7 @@ impl CryptoClient {
         crypto_key: &CryptoKey,
         mut keys: Keys,
     ) -> Result<Blob, SdkError> {
+        tracing::debug!(key_count = keys.keys.len(), "Encrypting vault keys");
         let mut plaintext = Zeroizing::new(Vec::new());
         let serialization_result = ciborium::into_writer(&keys, &mut *plaintext);
         keys.zeroize_passwords();
@@ -64,7 +65,9 @@ impl CryptoClient {
             CryptoKey::derive_subkey(&blob_key, blob_salt.salt(), AUTHENTICATION_KEY_INFO)?;
         // The random blob salt provides a fresh one-time key for each Poly1305 tag.
         let tag = poly1305_tag(&authentication_key, &encrypted_blob);
-        Ok(Blob::new(encrypted_blob, tag.to_vec()))
+        let blob = Blob::new(encrypted_blob, tag.to_vec());
+        tracing::debug!(blob_bytes = blob.blob.len(), "Vault keys encrypted");
+        Ok(blob)
     }
 
     pub fn decrypt_keys(
@@ -72,6 +75,7 @@ impl CryptoClient {
         crypto_key: &CryptoKey,
         blob: Blob,
     ) -> Result<Keys, SdkError> {
+        tracing::debug!(blob_bytes = blob.blob.len(), "Decrypting vault keys");
         if blob.tag.len() != TAG_SIZE {
             return Err(SdkError::Crypto(
                 "Blob has an invalid Poly1305 authentication tag length".to_owned(),
@@ -122,6 +126,7 @@ impl CryptoClient {
         let keys: Keys = ciborium::from_reader(plaintext.as_slice()).map_err(|error| {
             SdkError::Crypto(format!("Keys CBOR parsing failed: {error}"))
         })?;
+        tracing::debug!(key_count = keys.keys.len(), "Vault keys decrypted");
         Ok(keys)
     }
 

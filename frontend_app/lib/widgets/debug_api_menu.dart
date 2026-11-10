@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
 
@@ -25,6 +26,8 @@ class _DebugApiMenuState extends State<DebugApiMenu> {
     var url = authService.baseUrl;
     var selectedCert = authService.sslCaPinnedCert;
     var selectedCertPath = authService.sslCaPinnedCertPath;
+    var useBuiltinCa =
+        authService.sslCaPinnedCertPath == 'assets/certificates/ca.crt';
 
     final navigatorContext = widget.navigatorKey.currentState?.overlay?.context;
     if (navigatorContext == null) {
@@ -59,6 +62,50 @@ class _DebugApiMenuState extends State<DebugApiMenu> {
                 ),
               ),
               const SizedBox(height: 12),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: useBuiltinCa,
+                onChanged: (enabled) async {
+                  if (enabled != true) {
+                    setDialogState(() {
+                      useBuiltinCa = false;
+                      selectedCert = null;
+                      selectedCertPath = null;
+                    });
+                    return;
+                  }
+
+                  try {
+                    final certificate = await rootBundle.load(
+                      'assets/certificates/ca.crt',
+                    );
+                    setDialogState(() {
+                      useBuiltinCa = true;
+                      selectedCert = certificate.buffer.asUint8List(
+                        certificate.offsetInBytes,
+                        certificate.lengthInBytes,
+                      );
+                      selectedCertPath = 'assets/certificates/ca.crt';
+                    });
+                  } catch (error) {
+                    setDialogState(() => useBuiltinCa = false);
+                    widget.scaffoldMessengerKey.currentState?.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Не удалось загрузить встроенный CA: $error',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                title: const Text('Использовать встроенный CA Cert'),
+                subtitle: const Text(
+                  'Брать сертификат из assets/certificates/ca.crt',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFA1A1AA)),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const SizedBox(height: 4),
               OutlinedButton.icon(
                 onPressed: () async {
                   try {
@@ -74,6 +121,7 @@ class _DebugApiMenuState extends State<DebugApiMenu> {
                       throw StateError('Файл сертификата пуст или недоступен.');
                     }
                     setDialogState(() {
+                      useBuiltinCa = false;
                       selectedCert = bytes;
                       selectedCertPath = file.name;
                     });
@@ -96,6 +144,7 @@ class _DebugApiMenuState extends State<DebugApiMenu> {
               if (selectedCert != null)
                 TextButton(
                   onPressed: () => setDialogState(() {
+                    useBuiltinCa = false;
                     selectedCert = null;
                     selectedCertPath = null;
                   }),

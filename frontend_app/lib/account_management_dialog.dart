@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'rust/api/types/errors.dart';
 import 'rust/api/types/master_key.dart';
 import 'rust/api/types/security.dart';
 import 'services/auth_service.dart';
+import 'services/app_logger.dart';
+import 'services/error_mapper.dart';
 import 'services/webauthn_options.dart';
 import 'services/passkey_executor.dart';
 import 'services/totp_code.dart';
@@ -37,6 +40,12 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
   List<SecurityEvent> _events = [];
   bool _isLoading = true;
   bool _isLoadingMoreEvents = false;
+  bool _hasMoreEvents = true;
+  int _nextEventsOffset = 0;
+  static const _eventPageSize = 50;
+  static const _eventWindowSize = 200;
+  final ScrollController _eventsScrollController = ScrollController();
+  Timer? _eventsRefreshTimer;
   bool _isBusy = false;
   String? _busyStatus;
   String? _loadError;
@@ -44,7 +53,28 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
   @override
   void initState() {
     super.initState();
+    _eventsScrollController.addListener(_onEventsScroll);
     _loadData();
+    _eventsRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshLatestEvents(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _eventsRefreshTimer?.cancel();
+    _eventsScrollController
+      ..removeListener(_onEventsScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onEventsScroll() {
+    if (_eventsScrollController.position.pixels >=
+        _eventsScrollController.position.maxScrollExtent - 120) {
+      unawaited(_loadMoreEvents());
+    }
   }
 
   Future<T> _withFreshToken<T>(Future<T> Function(String token) action) async {
@@ -52,6 +82,7 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
     try {
       return await action(token);
     } on SdkError catch (error) {
+      if (error is SdkError_Network) AuthService().setOfflineMode(true);
       if (error is! SdkError_Server || error.code != 'AUTH_TOKEN_INVALID') {
         rethrow;
       }
@@ -81,13 +112,18 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
       if (!mounted) return;
       setState(() {
         _passkeys = passkeys;
-        _events = events;
+        _events = events.take(_eventWindowSize).toList();
+        _nextEventsOffset = events.length;
+        _hasMoreEvents = events.length == _eventPageSize;
         _isLoading = false;
       });
+      AppLogger.info(
+        'Account security data loaded: passkeys=${passkeys.length}, events=${events.length}.',
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = error.toString();
+        _loadError = describeAppError(error);
         _isLoading = false;
       });
     }
@@ -142,7 +178,7 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
       _showMessage('Passkey «${name.trim()}» добавлен.');
     } catch (error) {
       _showMessage(
-        'Не удалось зарегистрировать Passkey: $error',
+        'Не удалось зарегистрировать Passkey: ${describeAppError(error)}',
         isError: true,
       );
     } finally {
@@ -217,18 +253,30 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
           credentialId: passkey.credentialId,
         ),
       );
+      final requestOptions = PublicKeyCredentialRequestOptionsJson.fromJson(
+        parseWebAuthnPublicKeyOptions(challenge.passkeyPropsJson),
+      );
+      if (mounted) {
+        setState(() => _busyStatus = 'Подтвердите удаление через Passkey…');
+      }
+      final assertion = await authenticatePasskeyWithoutBlockingUi(
+        requestOptions,
+      );
       await _withFreshToken(
         (token) => client.deletePasskeyStep2(
           accessToken: token,
           operationId: challenge.operationId,
           credentialId: challenge.credentialId,
-          passkeyPropsJson: challenge.passkeyPropsJson,
+          passkeyPropsJson: jsonEncode(assertion.toJson()),
         ),
       );
       await _loadData();
       _showMessage('Passkey «${passkey.keyname}» удалён.');
     } catch (error) {
-      _showMessage('Не удалось удалить Passkey: $error', isError: true);
+      _showMessage(
+        'Не удалось удалить Passkey: ${describeAppError(error)}',
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -240,27 +288,79 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
   }
 
   Future<void> _loadMoreEvents() async {
-    if (_isLoadingMoreEvents || _events.length < 50) return;
+    if (AuthService().isOfflineMode ||
+        _isLoadingMoreEvents ||
+        !_hasMoreEvents) {
+      return;
+    }
     setState(() => _isLoadingMoreEvents = true);
     try {
       final client = await AuthService().createSecurityClient();
       final nextPage = await _withFreshToken(
         (token) => client.getEvents(
           accessToken: token,
-          limit: 50,
-          offset: _events.length,
+          limit: _eventPageSize,
+          offset: _nextEventsOffset,
         ),
       );
       if (mounted) {
         setState(() {
           final knownIds = _events.map((event) => event.id).toSet();
           _events.addAll(nextPage.where((event) => knownIds.add(event.id)));
+          _events = _events.take(_eventWindowSize).toList();
+          _nextEventsOffset += nextPage.length;
+          _hasMoreEvents = nextPage.length == _eventPageSize;
         });
       }
+      AppLogger.info(
+        'Older security events loaded: received=${nextPage.length}, totalInMemory=${_events.length}.',
+      );
     } catch (error) {
-      _showMessage('Не удалось загрузить события: $error', isError: true);
+      _showMessage(
+        'Не удалось загрузить события: ${describeAppError(error)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoadingMoreEvents = false);
+    }
+  }
+
+  Future<void> _refreshLatestEvents() async {
+    if (!mounted ||
+        AuthService().isOfflineMode ||
+        _isLoading ||
+        _isBusy ||
+        _isLoadingMoreEvents) {
+      return;
+    }
+    try {
+      final client = await AuthService().createSecurityClient();
+      final latest = await _withFreshToken(
+        (token) => client.getEvents(
+          accessToken: token,
+          limit: _eventPageSize,
+          offset: 0,
+        ),
+      );
+      if (!mounted || latest.isEmpty) return;
+
+      var newEventsCount = 0;
+      setState(() {
+        final knownIds = _events.map((event) => event.id).toSet();
+        final newEvents = latest
+            .where((event) => !knownIds.contains(event.id))
+            .toList();
+        newEventsCount = newEvents.length;
+        final merged = [...newEvents, ..._events];
+        _events = merged.take(_eventWindowSize).toList();
+        _nextEventsOffset += newEvents.length;
+        _hasMoreEvents = _hasMoreEvents || latest.length == _eventPageSize;
+      });
+      AppLogger.debug(
+        'Latest security events refreshed: received=${latest.length}, new=$newEventsCount.',
+      );
+    } catch (_) {
+      // Background event refresh is best-effort; the next timer tick retries.
     }
   }
 
@@ -325,7 +425,7 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
           ),
         );
       }
-      AuthService().clear();
+      await AuthService().clearAllCachedData();
       if (mounted) Navigator.pop(context);
       widget.onAccountDeleted();
     } catch (error) {
@@ -559,6 +659,7 @@ class _AccountManagementDialogState extends State<AccountManagementDialog> {
                 else
                   Expanded(
                     child: SingleChildScrollView(
+                      controller: _eventsScrollController,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [

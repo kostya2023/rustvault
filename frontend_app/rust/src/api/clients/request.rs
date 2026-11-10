@@ -20,10 +20,15 @@ pub(crate) struct RootOfTrust {
 }
 
 impl RootOfTrust {
-    /// Parse one PEM-encoded CA certificate for use as an additional trust root.
-    pub(crate) fn from_pem(ssl_ca_pinned_cert: Vec<u8>) -> Result<Self, SdkError> {
+    /// Parse one PEM- or DER-encoded CA certificate used as the only TLS trust root.
+    pub(crate) fn from_certificate_bytes(ssl_ca_pinned_cert: Vec<u8>) -> Result<Self, SdkError> {
         let certificate = reqwest::Certificate::from_pem(&ssl_ca_pinned_cert)
-            .map_err(|error| SdkError::Internal(format!("Invalid PEM CA certificate: {error}")))?;
+            .or_else(|_| reqwest::Certificate::from_der(&ssl_ca_pinned_cert))
+            .map_err(|error| {
+                SdkError::Internal(format!(
+                    "Invalid CA certificate: provide a PEM or DER encoded X.509 certificate: {error}"
+                ))
+            })?;
         Ok(Self { certificate })
     }
 }
@@ -86,7 +91,7 @@ impl Request {
             client_builder = client_builder.no_proxy();
         }
         if let Some(root_of_trust) = root_of_trust {
-            client_builder = client_builder.add_root_certificate(root_of_trust.certificate);
+            client_builder = client_builder.tls_certs_only([root_of_trust.certificate]);
         }
         let client = client_builder
             .build()
@@ -162,6 +167,7 @@ impl Request {
         version: i64,
         access_token: &str,
     ) -> Result<(), SdkError> {
+        tracing::info!(operation = "upload_blob", version, bytes = encrypted_blob.len(), "API blob upload started");
         let response = self
             .client
             .put(self.url("/v1/blob"))
@@ -171,19 +177,30 @@ impl Request {
             .body(encrypted_blob)
             .send()
             .await
-            .map_err(|error| SdkError::Network(error.to_string()))?;
+            .map_err(|error| {
+                tracing::warn!(operation = "upload_blob", "API blob upload failed at network layer");
+                SdkError::Network(error.to_string())
+            })?;
+        tracing::debug!(operation = "upload_blob", status = response.status().as_u16(), "API blob upload response received");
         self.read_no_content(response).await
     }
 
     pub(crate) async fn download_blob(&self, access_token: &str) -> Result<Vec<u8>, SdkError> {
+        tracing::info!(operation = "download_blob", "API blob download started");
         let response = self
             .client
             .get(self.url("/v1/blob"))
             .header(AUTHORIZATION, format!("Bearer {access_token}"))
             .send()
             .await
-            .map_err(|error| SdkError::Network(error.to_string()))?;
-        self.read_bytes(response).await
+            .map_err(|error| {
+                tracing::warn!(operation = "download_blob", "API blob download failed at network layer");
+                SdkError::Network(error.to_string())
+            })?;
+        let status = response.status().as_u16();
+        let bytes = self.read_bytes(response).await?;
+        tracing::debug!(operation = "download_blob", status, bytes = bytes.len(), "API blob download completed");
+        Ok(bytes)
     }
 
     async fn request<B: Serialize + ?Sized, T: DeserializeOwned>(
@@ -193,6 +210,7 @@ impl Request {
         body: Option<&B>,
         access_token: Option<&str>,
     ) -> Result<T, SdkError> {
+        tracing::debug!(method = method.as_str(), path, "API request started");
         let mut request = self.client.request(method, self.url(path));
         if let Some(token) = access_token {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));
@@ -200,10 +218,11 @@ impl Request {
         if let Some(body) = body {
             request = request.json(body);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|error| SdkError::Network(error.to_string()))?;
+        let response = request.send().await.map_err(|error| {
+            tracing::warn!(path, "API request failed at network layer");
+            SdkError::Network(error.to_string())
+        })?;
+        tracing::debug!(path, status = response.status().as_u16(), "API response received");
         let bytes = self.read_bytes(response).await?;
         serde_json::from_slice(&bytes)
             .map_err(|error| SdkError::Internal(format!("Invalid API response: {error}")))
@@ -216,6 +235,7 @@ impl Request {
         body: Option<&B>,
         access_token: Option<&str>,
     ) -> Result<(), SdkError> {
+        tracing::debug!(method = method.as_str(), path, "API request started");
         let mut request = self.client.request(method, self.url(path));
         if let Some(token) = access_token {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));
@@ -223,10 +243,11 @@ impl Request {
         if let Some(body) = body {
             request = request.json(body);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|error| SdkError::Network(error.to_string()))?;
+        let response = request.send().await.map_err(|error| {
+            tracing::warn!(path, "API request failed at network layer");
+            SdkError::Network(error.to_string())
+        })?;
+        tracing::debug!(path, status = response.status().as_u16(), "API response received");
         self.read_no_content(response).await
     }
 
@@ -260,12 +281,18 @@ impl Request {
 
     fn http_error(status: StatusCode, body: &[u8]) -> SdkError {
         if let Ok(error) = serde_json::from_slice::<ErrorBody>(body) {
+            tracing::warn!(
+                code = %error.error.code,
+                trace_id = %error.trace_id,
+                "API request rejected by server"
+            );
             return SdkError::Server {
                 code: error.error.code,
                 text: error.error.text,
                 trace_id: error.trace_id,
             };
         }
+        tracing::warn!(status = status.as_u16(), "API returned an unreadable error response");
         SdkError::Network(format!("HTTP {status}: {}", String::from_utf8_lossy(body)))
     }
 

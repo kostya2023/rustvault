@@ -99,7 +99,7 @@ services:
       - "80:8080"
       - "443:8443"
     environment:
-      SERVER_NAME: rustvault.ru
+      SERVER_NAME: rustvault.local
       PORT: 8080
       SSL_PORT: 8443
 
@@ -133,12 +133,19 @@ services:
       SERVER_TOKENS: "off"
       SERVER_HEADER: ""
 
+      SSL_CERT_FILE: /etc/nginx/conf/server.crt
+      SSL_CERT_KEY_FILE: /etc/nginx/conf/server.key
+
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
 
       # Mount your real certificate and key here for production:
       # - ./certs/fullchain.pem:/etc/nginx/conf/server.crt:ro
       # - ./certs/privkey.pem:/etc/nginx/conf/server.key:ro
+
+      # TLS certificates
+      - ./pki/target/fullchain.pem:/etc/nginx/conf/server.crt:ro
+      - ./pki/target/server.key:/etc/nginx/conf/server.key:ro
 
     depends_on:
       backend:

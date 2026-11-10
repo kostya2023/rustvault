@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'account_management_dialog.dart';
 import 'widgets/operation_stopwatch.dart';
 import 'services/auth_service.dart';
+import 'services/app_logger.dart';
+import 'services/error_mapper.dart';
 import 'main.dart';
 import 'rust/api/clients/vault_client.dart';
 import 'rust/api/clients/crypto_client.dart';
@@ -13,6 +15,17 @@ import 'rust/api/types/master_key.dart';
 import 'rust/api/types/blob.dart';
 import 'rust/api/types/crypto.dart' as rust_crypto;
 import 'rust/api/types/errors.dart';
+import 'services/local_vault_storage.dart';
+import 'services/memory_protection_service.dart';
+
+// Keep legacy diagnostic calls routed through the redacting logger.
+void debugPrint(String? message, {int? wrapWidth}) {
+  AppLogger.error('Dart diagnostic event: ${message ?? '<empty>'}');
+}
+
+void debugPrintStack({StackTrace? stackTrace}) {
+  AppLogger.error('Dart diagnostic stack trace.', stackTrace: stackTrace);
+}
 
 class PasswordItem {
   String title;
@@ -79,6 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late List<bool> _showPasswordList;
   bool _isLoggingOut = false;
+  CryptoKey? _cryptoKey;
+  bool _memoryLocked = false;
   final ScrollController _scrollController = ScrollController();
 
   // Очередь сохранений: параллельные вызовы объединяются, а версия блоба
@@ -87,12 +102,18 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _saveQueued = false;
   Timer? _saveDebounceTimer;
   Timer? _backgroundSyncTimer;
+  Timer? _clipboardClearTimer;
+  int _clipboardGeneration = 0;
   bool _hasPendingSave = false;
   int _changeRevision = 0;
 
   @override
   void initState() {
     super.initState();
+    _cryptoKey = widget.cryptoKey;
+    AuthService().registerActiveCryptoKey(_cryptoKey);
+    MemoryProtectionService().addListener(_onMemoryProtectionChanged);
+    AuthService().addListener(_onNetworkModeChanged);
     _showPasswordList = [];
     _loadVaultFromBackend();
     _backgroundSyncTimer = Timer.periodic(
@@ -105,9 +126,102 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _saveDebounceTimer?.cancel();
     _backgroundSyncTimer?.cancel();
+    _clipboardClearTimer?.cancel();
+    unawaited(_clearOwnedClipboard());
     _scrollController.dispose();
-    widget.cryptoKey?.zeroize();
+    MemoryProtectionService().removeListener(_onMemoryProtectionChanged);
+    AuthService().removeListener(_onNetworkModeChanged);
+    unawaited(AuthService().zeroizeActiveCryptoKey());
     super.dispose();
+  }
+
+  void _onNetworkModeChanged() {
+    if (!mounted ||
+        AuthService().isOfflineMode ||
+        !_vaultReady ||
+        _memoryLocked ||
+        _cryptoKey == null) {
+      return;
+    }
+    unawaited(_fetchVault(showFeedback: true, keepDataOnError: true));
+  }
+
+  void _onMemoryProtectionChanged() {
+    if (!mounted) return;
+    if (MemoryProtectionService().isLocked) {
+      _clipboardClearTimer?.cancel();
+      unawaited(_clearOwnedClipboard());
+      _copiedPassword = null;
+      setState(() {
+        _memoryLocked = true;
+        _cryptoKey = null;
+        _passwords = [];
+        _baseVaultPasswords = [];
+        _vaultReady = false;
+        _isLoadingVault = false;
+        _updatePasswordListState();
+      });
+      return;
+    }
+    unawaited(_restoreSensitiveMemory());
+  }
+
+  Future<void> _restoreSensitiveMemory() async {
+    final credentials = await LocalVaultStorage.instance.readCredentials();
+    if (!mounted || credentials == null) return;
+    try {
+      final userPassword = await UserPassword.newInstance(
+        password: credentials.$2,
+      );
+      final key = await CryptoKey.fromUserPassword(
+        userPassword: userPassword,
+        username: credentials.$1,
+      );
+      if (!mounted || MemoryProtectionService().isLocked) {
+        await key.zeroize();
+        return;
+      }
+      _cryptoKey = key;
+      AuthService().registerActiveCryptoKey(key);
+      setState(() {
+        _memoryLocked = false;
+        _isLoadingVault = true;
+      });
+      await _fetchVault(showFeedback: false, keepDataOnError: true);
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'Sensitive memory restore failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _clearOwnedClipboard() async {
+    final generation = _clipboardGeneration;
+    final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+    if (generation == _clipboardGeneration &&
+        clipboard?.text == _copiedPassword) {
+      await Clipboard.setData(const ClipboardData(text: ''));
+    }
+  }
+
+  String? _copiedPassword;
+
+  Future<void> _copyPassword(String password) async {
+    _clipboardClearTimer?.cancel();
+    final generation = ++_clipboardGeneration;
+    _copiedPassword = password;
+    await Clipboard.setData(ClipboardData(text: password));
+
+    _clipboardClearTimer = Timer(const Duration(seconds: 30), () async {
+      if (generation != _clipboardGeneration) return;
+      final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+      if (generation == _clipboardGeneration && clipboard?.text == password) {
+        await Clipboard.setData(const ClipboardData(text: ''));
+        _copiedPassword = null;
+      }
+    });
   }
 
   void _updatePasswordListState() {
@@ -117,8 +231,19 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _resolveAccessToken() =>
       AuthService().accessToken ?? widget.accessToken;
 
+  Future<void> _cacheBlob(Blob blob, {int? version}) async {
+    try {
+      await LocalVaultStorage.instance.saveBlob(
+        await blob.serializeCbor(),
+        version: version,
+      );
+    } catch (error) {
+      debugPrint('Failed to save local blob: $error');
+    }
+  }
+
   bool get _isDemoSession =>
-      widget.cryptoKey == null && _resolveAccessToken() == null;
+      _cryptoKey == null && _resolveAccessToken() == null;
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
@@ -134,7 +259,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  String _describeError(Object error) {
+  // Kept for compatibility with older UI text while all current paths use
+  // the redacted error mapper below.
+  // ignore: unused_element
+  String _legacyDescribeError(Object error) {
     if (error is SdkError_Server) {
       switch (error.code) {
         case 'AUTH_TOKEN_INVALID':
@@ -166,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return error.toString();
   }
 
+  String _describeError(Object error) => describeAppError(error);
+
   bool _isMetadataMissing(Object error) =>
       error is SdkError_Server && error.code == 'VAULT_METADATA_NOT_FOUND';
 
@@ -182,6 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       return await action(accessToken);
     } on SdkError catch (error) {
+      if (error is SdkError_Network) AuthService().setOfflineMode(true);
       final isAuthError =
           error is SdkError_Server && error.code == 'AUTH_TOKEN_INVALID';
       if (!isAuthError) rethrow;
@@ -211,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    if (widget.cryptoKey == null) {
+    if (_cryptoKey == null) {
       _showSnack(
         _isDemoSession
             ? 'Демо-вход admin/admin не подключён к серверу. Войдите реальным аккаунтом.'
@@ -231,12 +362,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _refreshVaultInBackground() async {
     if (!mounted ||
+        AuthService().isOfflineMode ||
         !_vaultReady ||
         _hasPendingSave ||
         _isSavingVault ||
         _isSyncing ||
         _isBackgroundRefreshing ||
-        widget.cryptoKey == null ||
+        _cryptoKey == null ||
         _resolveAccessToken() == null) {
       return;
     }
@@ -259,10 +391,11 @@ class _HomeScreenState extends State<HomeScreen> {
           metadata.version <= _currentVaultVersion) {
         return;
       }
+      await _cacheBlob(blob, version: metadata.version);
 
       final cryptoClient = await CryptoClient.newInstance();
       final keys = await cryptoClient.decryptKeys(
-        cryptoKey: widget.cryptoKey!,
+        cryptoKey: _cryptoKey!,
         blob: blob,
       );
       if (!mounted ||
@@ -280,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _activityStatus = 'Получены изменения с сервера';
       });
     } catch (error, stackTrace) {
-      debugPrint('Ошибка фонового обновления хранилища: $error');
+      debugPrint('Vault background refresh failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _isBackgroundRefreshing = false;
@@ -294,7 +427,24 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool showFeedback,
     bool keepDataOnError = false,
   }) async {
-    final cryptoKey = widget.cryptoKey;
+    final cryptoKey = _cryptoKey;
+
+    if (AuthService().isOfflineMode) {
+      if (cryptoKey != null &&
+          await _restoreCachedVault(cryptoKey, showFeedback: showFeedback)) {
+        return true;
+      }
+      if (mounted) {
+        setState(() {
+          _isLoadingVault = false;
+          _vaultReady = false;
+          _vaultError =
+              'Офлайн-режим: локальный зашифрованный blob недоступен.';
+          _activityStatus = 'Офлайн-режим';
+        });
+      }
+      return false;
+    }
 
     if (cryptoKey == null) {
       if (mounted) {
@@ -377,14 +527,42 @@ class _HomeScreenState extends State<HomeScreen> {
         return true;
       }
 
-      final Blob blob = await _withTokenRetry(
-        (accessToken) => vaultClient.download(accessToken: accessToken),
-      );
+      Blob blob;
+      late rust_crypto.Keys keys;
+      var usedCachedBlob = false;
+      final cachedVersion = await LocalVaultStorage.instance.readBlobVersion();
+      final cachedEncoded = await LocalVaultStorage.instance.readBlob();
+
+      if (cachedEncoded != null &&
+          cachedEncoded.isNotEmpty &&
+          cachedVersion == storedVersion) {
+        try {
+          blob = await Blob.deserializeCbor(encoded: cachedEncoded.toList());
+          keys = await cryptoClient.decryptKeys(
+            cryptoKey: cryptoKey,
+            blob: blob,
+          );
+          usedCachedBlob = true;
+        } catch (error) {
+          AppLogger.error(
+            'Cached blob is invalid; downloading a fresh version.',
+            error: error,
+          );
+          usedCachedBlob = false;
+        }
+      }
+
+      if (!usedCachedBlob) {
+        blob = await _withTokenRetry(
+          (accessToken) => vaultClient.download(accessToken: accessToken),
+        );
+        await _cacheBlob(blob, version: storedVersion);
+        keys = await cryptoClient.decryptKeys(cryptoKey: cryptoKey, blob: blob);
+      }
 
       // decryptKeys возвращает Keys напрямую и не требует работы с TbsBlob.
-      final rust_crypto.Keys keys = await cryptoClient.decryptKeys(
-        cryptoKey: cryptoKey,
-        blob: blob,
+      AppLogger.info(
+        usedCachedBlob ? 'Использован локальный blob совпадающей версии.' : 'Локальный blob отсутствует или устарел, загружена версия сервера.',
       );
 
       if (!mounted) return true;
@@ -410,9 +588,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return true;
     } catch (error, stackTrace) {
-      debugPrint('Ошибка загрузки/расшифровки хранилища: $error');
+      debugPrint('Vault load or decryption failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
+      if (await _restoreCachedVault(cryptoKey, showFeedback: showFeedback)) {
+        return true;
+      }
       if (!mounted) return false;
 
       setState(() {
@@ -435,7 +616,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 📤 Шифрование и отправка хранилища на сервер.
+  Future<bool> _restoreCachedVault(
+    CryptoKey cryptoKey, {
+    required bool showFeedback,
+  }) async {
+    try {
+      final encoded = await LocalVaultStorage.instance.readBlob();
+      if (encoded == null || encoded.isEmpty) return false;
+      final blob = await Blob.deserializeCbor(encoded: encoded.toList());
+      final cryptoClient = await CryptoClient.newInstance();
+      final keys = await cryptoClient.decryptKeys(
+        cryptoKey: cryptoKey,
+        blob: blob,
+      );
+      final version = await LocalVaultStorage.instance.readBlobVersion();
+      if (!mounted) return false;
+      setState(() {
+        _currentVaultVersion = version;
+        _passwords = keys.keys.map(PasswordItem.fromRustKey).toList();
+        _baseVaultPasswords = List.of(_passwords);
+        _updatePasswordListState();
+        _vaultReady = true;
+        _vaultError = null;
+        _isLoadingVault = false;
+        _activityStatus = 'Офлайн-кеш: сервер временно недоступен';
+      });
+      if (showFeedback) {
+        _showSnack(
+          'Показан локальный зашифрованный кеш. Изменения синхронизируются после восстановления связи.',
+        );
+      }
+      return true;
+    } catch (error) {
+      debugPrint('Local cache decryption failed: $error');
+      return false;
+    }
+  }
+
   void _requestVaultSave() {
+    if (AuthService().isOfflineMode) {
+      _showSnack(
+        'Офлайн-режим: изменения не отправляются на сервер.',
+        isError: true,
+      );
+      return;
+    }
     _hasPendingSave = true;
     _saveDebounceTimer?.cancel();
     _saveCountdownSeconds = 30;
@@ -459,6 +684,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _queueVaultSave() {
+    if (AuthService().isOfflineMode) return;
     _saveDebounceTimer?.cancel();
     _saveCountdownSeconds = 0;
     if (_saveChain != null) {
@@ -490,7 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _saveVaultToBackend() async {
-    final cryptoKey = widget.cryptoKey;
+    final cryptoKey = _cryptoKey;
 
     if (cryptoKey == null) {
       _showSnack('Нет криптографического ключа сессии.', isError: true);
@@ -558,7 +784,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (error, stackTrace) {
-      debugPrint('Ошибка сохранения хранилища: $error');
+      debugPrint('Vault save failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
@@ -614,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> {
         (accessToken) => vaultClient.download(accessToken: accessToken),
       );
       final serverKeys = await cryptoClient.decryptKeys(
-        cryptoKey: widget.cryptoKey!,
+        cryptoKey: _cryptoKey!,
         blob: serverBlob,
       );
       final mergedPasswords = await _mergeVaultPasswords(
@@ -635,7 +861,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
       final mergedBlob = await cryptoClient.encryptKeys(
-        cryptoKey: widget.cryptoKey!,
+        cryptoKey: _cryptoKey!,
         keys: rust_crypto.Keys(
           keys: mergedPasswords.map((item) => item.toRustKey()).toList(),
         ),
@@ -1064,7 +1290,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AccountManagementDialog(
         username: widget.username,
         accessToken: accessToken,
-        cryptoKey: widget.cryptoKey,
+        cryptoKey: _cryptoKey,
         onAccountDeleted: () {
           Navigator.pushAndRemoveUntil(
             this.context,
@@ -1263,7 +1489,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildVaultUnavailable() {
-    final hasKey = widget.cryptoKey != null;
+    final hasKey = _cryptoKey != null;
 
     return Center(
       child: Padding(
@@ -1341,7 +1567,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Color(0xFF3B82F6),
           ),
           onPressed: () {
-            Clipboard.setData(ClipboardData(text: item.password));
+            unawaited(_copyPassword(item.password));
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('📋 Пароль скопирован!'),
@@ -1370,107 +1596,501 @@ class _HomeScreenState extends State<HomeScreen> {
     final isPhoneWidth = MediaQuery.sizeOf(context).width < 600;
     return Scaffold(
       backgroundColor: const Color(0xFF09090E),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isPhoneWidth ? 12 : 24,
-                vertical: 14,
-              ),
-              decoration: const BoxDecoration(
-                color: Color(0xFF101016),
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFF1E293B), width: 1),
-                ),
-              ),
-              child: Row(
+      body: _memoryLocked
+          ? _buildMemoryLockedScreen()
+          : SafeArea(
+              child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E3A8A).withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFF3B82F6),
-                        width: 1.5,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isPhoneWidth ? 12 : 24,
+                      vertical: 14,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF101016),
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFF1E293B), width: 1),
                       ),
                     ),
-                    child: const Icon(
-                      Icons.shield_outlined,
-                      color: Color(0xFF60A5FA),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'RustVault',
-                    style: TextStyle(
-                      fontSize: isPhoneWidth ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFFAFAFA),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_isSavingVault) ...[
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF3B82F6),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (!isPhoneWidth)
-                      const Text(
-                        'Сохранение…',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ),
-                    SizedBox(width: isPhoneWidth ? 4 : 12),
-                  ],
-                  GestureDetector(
-                    onTap: _showProfileDialog,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF14141E),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF3B82F6)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 15,
-                            color: Color(0xFF3B82F6),
-                          ),
-                          const SizedBox(width: 6),
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: isPhoneWidth ? 96 : 180,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E3A8A).withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFF3B82F6),
+                              width: 1.5,
                             ),
-                            child: Text(
-                              widget.username,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFFAFAFA),
+                          ),
+                          child: const Icon(
+                            Icons.shield_outlined,
+                            color: Color(0xFF60A5FA),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'RustVault',
+                          style: TextStyle(
+                            fontSize: isPhoneWidth ? 16 : 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFAFAFA),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_isSavingVault) ...[
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF3B82F6),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (!isPhoneWidth)
+                            const Text(
+                              'Сохранение…',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
                               ),
                             ),
+                          SizedBox(width: isPhoneWidth ? 4 : 12),
+                        ],
+                        GestureDetector(
+                          onTap: _showProfileDialog,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF14141E),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF3B82F6),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.person_outline,
+                                  size: 15,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                                const SizedBox(width: 6),
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: isPhoneWidth ? 96 : 180,
+                                  ),
+                                  child: Text(
+                                    widget.username,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFFAFAFA),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 16,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ],
+                            ),
                           ),
-                          const Icon(
-                            Icons.arrow_drop_down,
-                            size: 16,
-                            color: Color(0xFF94A3B8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isPhoneWidth ? 12 : 24,
+                        vertical: isPhoneWidth ? 12 : 20,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111827),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _activityStatus.startsWith('Ошибка')
+                                    ? const Color(0xFF7F1D1D)
+                                    : const Color(0xFF1E3A5F),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    if (_isLoadingVault ||
+                                        _isSavingVault ||
+                                        _isSyncing)
+                                      const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    else
+                                      Icon(
+                                        _activityStatus.startsWith('Ошибка')
+                                            ? Icons.error_outline
+                                            : Icons.cloud_done_outlined,
+                                        size: 18,
+                                        color:
+                                            _activityStatus.startsWith('Ошибка')
+                                            ? const Color(0xFFF87171)
+                                            : const Color(0xFF60A5FA),
+                                      ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _activityStatus,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFFCBD5E1),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_isLoadingVault ||
+                                        _isSavingVault ||
+                                        _isSyncing ||
+                                        _isBackgroundRefreshing) ...[
+                                      const SizedBox(width: 8),
+                                      const OperationStopwatch(running: true),
+                                    ],
+                                    if (_hasPendingSave)
+                                      TextButton(
+                                        onPressed: _isSavingVault
+                                            ? null
+                                            : _forceSaveNow,
+                                        child: const Text(
+                                          'Синхронизировать сейчас',
+                                          style: TextStyle(fontSize: 11),
+                                        ),
+                                      )
+                                    else if (_activityStatus.startsWith(
+                                      'Ошибка',
+                                    ))
+                                      IconButton(
+                                        tooltip: 'Повторить синхронизацию',
+                                        onPressed: _isSavingVault
+                                            ? null
+                                            : _queueVaultSave,
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 18,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if (_saveCountdownSeconds > 0) ...[
+                                  const SizedBox(height: 8),
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(
+                                      begin: 0,
+                                      end: 1 - _saveCountdownSeconds / 30,
+                                    ),
+                                    duration: const Duration(seconds: 1),
+                                    curve: Curves.easeInOut,
+                                    builder: (context, progress, child) =>
+                                        LinearProgressIndicator(
+                                          value: progress,
+                                          minHeight: 5,
+                                          backgroundColor: const Color(
+                                            0xFF1E293B,
+                                          ),
+                                          valueColor:
+                                              const AlwaysStoppedAnimation(
+                                                Color(0xFF60A5FA),
+                                              ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Осталось $_saveCountdownSeconds сек.',
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '🔐 Мои пароли',
+                                style: TextStyle(
+                                  fontSize: isPhoneWidth ? 18 : 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFFAFAFA),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Синхронизировать с сервером',
+                                onPressed:
+                                    (_isSyncing ||
+                                        _isLoadingVault ||
+                                        _cryptoKey == null)
+                                    ? null
+                                    : _syncVaultFromServer,
+                                icon: _isSyncing
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF3B82F6),
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.sync,
+                                        size: 20,
+                                        color: Color(0xFF3B82F6),
+                                      ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed:
+                                    (_cryptoKey == null ||
+                                        !_vaultReady ||
+                                        _isLoadingVault)
+                                    ? null
+                                    : _showAddPasswordDialog,
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Добавить пароль'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: _isLoadingVault && !_vaultReady
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF3B82F6),
+                                    ),
+                                  )
+                                : !_vaultReady
+                                ? _buildVaultUnavailable()
+                                : _passwords.isEmpty
+                                ? _buildEmptyVault()
+                                : Scrollbar(
+                                    controller: _scrollController,
+                                    thumbVisibility: true,
+                                    child: ListView.separated(
+                                      controller: _scrollController,
+                                      itemCount: _passwords.length,
+                                      separatorBuilder: (context, index) =>
+                                          const SizedBox(height: 8),
+                                      itemBuilder: (context, index) {
+                                        final item = _passwords[index];
+                                        final isVisible =
+                                            _showPasswordList[index];
+
+                                        return GestureDetector(
+                                          onTap: () =>
+                                              _showEditPasswordDialog(index),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF121218),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                            ),
+                                            child: isPhoneWidth
+                                                ? Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .stretch,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                                Text(
+                                                                  item.title,
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                  style: const TextStyle(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                    color: Color(
+                                                                      0xFFFAFAFA,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                  height: 2,
+                                                                ),
+                                                                Text(
+                                                                  item.login,
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        12,
+                                                                    color: Color(
+                                                                      0xFF94A3B8,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          _buildPasswordActions(
+                                                            index: index,
+                                                            item: item,
+                                                            isVisible:
+                                                                isVisible,
+                                                            compact: true,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 6),
+                                                      Text(
+                                                        isVisible
+                                                            ? item.password
+                                                            : '••••••••••••••••',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontFamily: isVisible
+                                                              ? 'monospace'
+                                                              : null,
+                                                          color: const Color(
+                                                            0xFFCBD5E1,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                : Row(
+                                                    children: [
+                                                      Expanded(
+                                                        flex: 2,
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              item.title,
+                                                              style: const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Color(
+                                                                  0xFFFAFAFA,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            Text(
+                                                              item.login,
+                                                              style:
+                                                                  const TextStyle(
+                                                                    fontSize:
+                                                                        12,
+                                                                    color: Color(
+                                                                      0xFF94A3B8,
+                                                                    ),
+                                                                  ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        flex: 3,
+                                                        child: Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                isVisible
+                                                                    ? item.password
+                                                                    : '••••••••••••••••',
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontFamily:
+                                                                      isVisible
+                                                                      ? 'monospace'
+                                                                      : null,
+                                                                  color: const Color(
+                                                                    0xFFCBD5E1,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            _buildPasswordActions(
+                                                              index: index,
+                                                              item: item,
+                                                              isVisible:
+                                                                  isVisible,
+                                                              compact: false,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -1479,372 +2099,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isPhoneWidth ? 12 : 24,
-                  vertical: isPhoneWidth ? 12 : 20,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF111827),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _activityStatus.startsWith('Ошибка')
-                              ? const Color(0xFF7F1D1D)
-                              : const Color(0xFF1E3A5F),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              if (_isLoadingVault ||
-                                  _isSavingVault ||
-                                  _isSyncing)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              else
-                                Icon(
-                                  _activityStatus.startsWith('Ошибка')
-                                      ? Icons.error_outline
-                                      : Icons.cloud_done_outlined,
-                                  size: 18,
-                                  color: _activityStatus.startsWith('Ошибка')
-                                      ? const Color(0xFFF87171)
-                                      : const Color(0xFF60A5FA),
-                                ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _activityStatus,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xFFCBD5E1),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              if (_isLoadingVault ||
-                                  _isSavingVault ||
-                                  _isSyncing ||
-                                  _isBackgroundRefreshing) ...[
-                                const SizedBox(width: 8),
-                                const OperationStopwatch(running: true),
-                              ],
-                              if (_hasPendingSave)
-                                TextButton(
-                                  onPressed: _isSavingVault
-                                      ? null
-                                      : _forceSaveNow,
-                                  child: const Text(
-                                    'Синхронизировать сейчас',
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                )
-                              else if (_activityStatus.startsWith('Ошибка'))
-                                IconButton(
-                                  tooltip: 'Повторить синхронизацию',
-                                  onPressed: _isSavingVault
-                                      ? null
-                                      : _queueVaultSave,
-                                  icon: const Icon(Icons.refresh, size: 18),
-                                ),
-                            ],
-                          ),
-                          if (_saveCountdownSeconds > 0) ...[
-                            const SizedBox(height: 8),
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(
-                                begin: 0,
-                                end: 1 - _saveCountdownSeconds / 30,
-                              ),
-                              duration: const Duration(seconds: 1),
-                              curve: Curves.easeInOut,
-                              builder: (context, progress, child) =>
-                                  LinearProgressIndicator(
-                                    value: progress,
-                                    minHeight: 5,
-                                    backgroundColor: const Color(0xFF1E293B),
-                                    valueColor: const AlwaysStoppedAnimation(
-                                      Color(0xFF60A5FA),
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Осталось $_saveCountdownSeconds сек.',
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          '🔐 Мои пароли',
-                          style: TextStyle(
-                            fontSize: isPhoneWidth ? 18 : 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFAFAFA),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Синхронизировать с сервером',
-                          onPressed:
-                              (_isSyncing ||
-                                  _isLoadingVault ||
-                                  widget.cryptoKey == null)
-                              ? null
-                              : _syncVaultFromServer,
-                          icon: _isSyncing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF3B82F6),
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.sync,
-                                  size: 20,
-                                  color: Color(0xFF3B82F6),
-                                ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed:
-                              (widget.cryptoKey == null ||
-                                  !_vaultReady ||
-                                  _isLoadingVault)
-                              ? null
-                              : _showAddPasswordDialog,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Добавить пароль'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _isLoadingVault && !_vaultReady
-                          ? const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF3B82F6),
-                              ),
-                            )
-                          : !_vaultReady
-                          ? _buildVaultUnavailable()
-                          : _passwords.isEmpty
-                          ? _buildEmptyVault()
-                          : Scrollbar(
-                              controller: _scrollController,
-                              thumbVisibility: true,
-                              child: ListView.separated(
-                                controller: _scrollController,
-                                itemCount: _passwords.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final item = _passwords[index];
-                                  final isVisible = _showPasswordList[index];
+    );
+  }
 
-                                  return GestureDetector(
-                                    onTap: () => _showEditPasswordDialog(index),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF121218),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: const Color(0xFF1E293B),
-                                        ),
-                                      ),
-                                      child: isPhoneWidth
-                                          ? Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.stretch,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            item.title,
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  color: Color(
-                                                                    0xFFFAFAFA,
-                                                                  ),
-                                                                ),
-                                                          ),
-                                                          const SizedBox(
-                                                            height: 2,
-                                                          ),
-                                                          Text(
-                                                            item.login,
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontSize: 12,
-                                                                  color: Color(
-                                                                    0xFF94A3B8,
-                                                                  ),
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    _buildPasswordActions(
-                                                      index: index,
-                                                      item: item,
-                                                      isVisible: isVisible,
-                                                      compact: true,
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  isVisible
-                                                      ? item.password
-                                                      : '••••••••••••••••',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontFamily: isVisible
-                                                        ? 'monospace'
-                                                        : null,
-                                                    color: const Color(
-                                                      0xFFCBD5E1,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : Row(
-                                              children: [
-                                                Expanded(
-                                                  flex: 2,
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        item.title,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Color(
-                                                            0xFFFAFAFA,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        item.login,
-                                                        style: const TextStyle(
-                                                          fontSize: 12,
-                                                          color: Color(
-                                                            0xFF94A3B8,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  flex: 3,
-                                                  child: Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Text(
-                                                          isVisible
-                                                              ? item.password
-                                                              : '••••••••••••••••',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontFamily:
-                                                                isVisible
-                                                                ? 'monospace'
-                                                                : null,
-                                                            color: const Color(
-                                                              0xFFCBD5E1,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      _buildPasswordActions(
-                                                        index: index,
-                                                        item: item,
-                                                        isVisible: isVisible,
-                                                        compact: false,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
+  Widget _buildMemoryLockedScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock, size: 54, color: Color(0xFF60A5FA)),
+            const SizedBox(height: 18),
+            const Text(
+              'Sensitive data is locked',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'The vault was removed from memory while the app was inactive. Restoring it…',
+              style: TextStyle(color: Color(0xFF94A3B8)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 22),
+            const CircularProgressIndicator(color: Color(0xFF60A5FA)),
           ],
         ),
       ),

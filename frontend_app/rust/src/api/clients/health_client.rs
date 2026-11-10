@@ -28,7 +28,7 @@ impl HealthClient {
         ssl_ca_pinned_cert: Option<Vec<u8>>,
     ) -> Result<Self, SdkError> {
         let root_of_trust = ssl_ca_pinned_cert
-            .map(RootOfTrust::from_pem)
+            .map(RootOfTrust::from_certificate_bytes)
             .transpose()?;
         Ok(Self {
             request: Request::new_with_root_of_trust(root_of_trust)?,
@@ -40,7 +40,7 @@ impl HealthClient {
         ssl_ca_pinned_cert: Option<Vec<u8>>,
     ) -> Result<Self, SdkError> {
         let root_of_trust = ssl_ca_pinned_cert
-            .map(RootOfTrust::from_pem)
+            .map(RootOfTrust::from_certificate_bytes)
             .transpose()?;
         Ok(Self {
             request: Request::with_base_url_and_root_of_trust(base_url, root_of_trust)?,

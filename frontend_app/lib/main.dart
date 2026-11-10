@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webauthn_secure_storage/webauthn_secure_storage.dart';
@@ -8,9 +9,13 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'services/auth_service.dart';
+import 'services/app_logger.dart';
 import 'services/webauthn_options.dart';
 import 'services/passkey_executor.dart';
 import 'services/totp_code.dart';
+import 'services/local_vault_storage.dart';
+import 'services/memory_protection_service.dart';
+import 'services/window_service.dart';
 import 'widgets/operation_stopwatch.dart';
 import 'widgets/debug_api_menu.dart';
 import 'rust/frb_generated.dart';
@@ -21,24 +26,89 @@ import 'home_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+const _releaseBaseUrl = 'https://rustvault.local:443';
+const _releaseCaCertificateAsset = 'assets/certificates/ca.crt';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppLogger.info('Application startup started.');
+  await initializeDesktopWindow();
 
   await RustLib.init();
+  AppLogger.info('Rust bridge initialized.');
 
-  runApp(const MyApp());
+  if (kReleaseMode) {
+    final certificate = await rootBundle.load(_releaseCaCertificateAsset);
+    AuthService().configureRelease(
+      baseUrl: _releaseBaseUrl,
+      sslCaPinnedCert: certificate.buffer.asUint8List(
+        certificate.offsetInBytes,
+        certificate.lengthInBytes,
+      ),
+    );
+  }
+
+  final serverAvailable = await AuthService().checkServerHealth();
+  await AuthService().restoreSession(refresh: serverAvailable);
+  AppLogger.info('Cached session restore completed.');
+
+  runApp(
+    DesktopWindowShell(navigatorKey: _rootNavigatorKey, child: const MyApp()),
+  );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _handledExpiredSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService().addListener(_handleAuthStateChanged);
+  }
+
+  @override
+  void dispose() {
+    AuthService().removeListener(_handleAuthStateChanged);
+    super.dispose();
+  }
+
+  void _handleAuthStateChanged() {
+    final expired = AuthService().sessionExpired;
+    if (!expired) {
+      _handledExpiredSession = false;
+      return;
+    }
+    if (_handledExpiredSession || !mounted) return;
+    _handledExpiredSession = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _rootNavigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        (_) => false,
+      );
+      _rootScaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Session expired. Please sign in again.'),
+          ),
+        );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _rootNavigatorKey,
       scaffoldMessengerKey: _rootScaffoldMessengerKey,
-      title: 'RustPass Manager',
+      title: 'RustVault',
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
         final compact = MediaQuery.sizeOf(context).width < 600;
@@ -50,18 +120,25 @@ class MyApp extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               child!,
-              Positioned(
-                left: 12,
-                bottom: keyboardInset > 0 ? keyboardInset + 8 : 12,
-                child: SafeArea(
-                  top: false,
-                  right: true,
-                  child: DebugApiMenu(
-                    compact: compact,
-                    navigatorKey: _rootNavigatorKey,
-                    scaffoldMessengerKey: _rootScaffoldMessengerKey,
+              if (!kReleaseMode)
+                Positioned(
+                  left: 12,
+                  bottom: keyboardInset > 0 ? keyboardInset + 8 : 12,
+                  child: SafeArea(
+                    top: false,
+                    right: true,
+                    child: DebugApiMenu(
+                      compact: compact,
+                      navigatorKey: _rootNavigatorKey,
+                      scaffoldMessengerKey: _rootScaffoldMessengerKey,
+                    ),
                   ),
                 ),
+              const Positioned(
+                left: 12,
+                right: 12,
+                top: 12,
+                child: SafeArea(bottom: false, child: OfflineModeNotice()),
               ),
             ],
           ),
@@ -100,12 +177,83 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   String _authStatus = '';
 
+  @override
+  void initState() {
+    super.initState();
+    MemoryProtectionService().addListener(_handleMemoryProtectionChanged);
+    _restoreCachedLogin();
+  }
+
+  void _handleMemoryProtectionChanged() {
+    if (!MemoryProtectionService().isLocked) return;
+    _loginController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+  }
+
+  Future<void> _restoreCachedLogin() async {
+    final credentials = await LocalVaultStorage.instance.readCredentials();
+    if (!mounted || credentials == null) {
+      return;
+    }
+    if (!AuthService().isOfflineMode && AuthService().accessToken == null) {
+      return;
+    }
+    try {
+      final userPassword = await UserPassword.newInstance(
+        password: credentials.$2,
+      );
+      final cryptoKey = await CryptoKey.fromUserPassword(
+        userPassword: userPassword,
+        username: credentials.$1,
+      );
+      if (AuthService().isOfflineMode) {
+        if (!mounted) {
+          await cryptoKey.zeroize();
+          return;
+        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              username: credentials.$1,
+              cryptoKey: cryptoKey,
+              accessToken: AuthService().accessToken,
+            ),
+          ),
+        );
+        return;
+      }
+      final account = await (await AuthService().createAccountClient()).getInfo(
+        accessToken: AuthService().accessToken!,
+      );
+      if (!mounted) {
+        await cryptoKey.zeroize();
+        return;
+      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            username: account.username,
+            cryptoKey: cryptoKey,
+            accessToken: AuthService().accessToken,
+          ),
+        ),
+      );
+    } catch (_) {
+      AuthService().clear();
+      await LocalVaultStorage.instance.clearCredentials();
+    }
+  }
+
   void _setAuthStatus(String status) {
     if (mounted) setState(() => _authStatus = status);
   }
 
   @override
   void dispose() {
+    MemoryProtectionService().removeListener(_handleMemoryProtectionChanged);
     _loginController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -200,6 +348,10 @@ class _AuthScreenState extends State<AuthScreen> {
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
       AuthService().saveTokens(tokens.$1, tokens.$2);
+      await LocalVaultStorage.instance.saveCredentials(
+        username: username,
+        password: password,
+      );
 
       if (mounted) {
         final CryptoKey vaultCryptoKey = cryptoKey;
@@ -307,6 +459,10 @@ class _AuthScreenState extends State<AuthScreen> {
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
       AuthService().saveTokens(tokens.$1, tokens.$2);
+      await LocalVaultStorage.instance.saveCredentials(
+        username: accountInfo.username,
+        password: password,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -370,6 +526,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
       _setAuthStatus('Завершение регистрации…');
       AuthService().saveTokens(tokens.$1, tokens.$2);
+      await LocalVaultStorage.instance.saveCredentials(
+        username: username,
+        password: password,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -909,6 +1069,77 @@ class _AuthScreenState extends State<AuthScreen> {
         borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
       ),
       errorStyle: const TextStyle(fontSize: 12),
+    );
+  }
+}
+
+class OfflineModeNotice extends StatefulWidget {
+  const OfflineModeNotice({super.key});
+
+  @override
+  State<OfflineModeNotice> createState() => _OfflineModeNoticeState();
+}
+
+class _OfflineModeNoticeState extends State<OfflineModeNotice> {
+  bool _isChecking = false;
+
+  Future<void> _checkAccess() async {
+    if (_isChecking) return;
+    setState(() => _isChecking = true);
+    final available = await AuthService().checkServerHealth();
+    if (mounted) {
+      setState(() => _isChecking = false);
+      if (available) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Соединение восстановлено.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: AuthService(),
+      builder: (context, _) {
+        if (!AuthService().isOfflineMode) return const SizedBox.shrink();
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3F2A08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF59E0B)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x55000000), blurRadius: 12),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.cloud_off, color: Color(0xFFFBBF24), size: 20),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Приложение в офлайн-режиме.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isChecking ? null : _checkAccess,
+                  child: _isChecking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Проверить доступ'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

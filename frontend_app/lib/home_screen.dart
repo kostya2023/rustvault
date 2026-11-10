@@ -40,8 +40,14 @@ class PasswordItem {
 class HomeScreen extends StatefulWidget {
   final String username;
   final CryptoKey? cryptoKey;
+  final String? accessToken;
 
-  const HomeScreen({super.key, required this.username, this.cryptoKey});
+  const HomeScreen({
+    super.key,
+    required this.username,
+    this.cryptoKey,
+    this.accessToken,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -89,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final accessToken = AuthService().accessToken;
+      final accessToken = AuthService().accessToken ?? widget.accessToken;
       final baseUrl = AuthService().baseUrl;
 
       if (accessToken == null) {
@@ -165,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final accessToken = AuthService().accessToken;
+      final accessToken = AuthService().accessToken ?? widget.accessToken;
       final baseUrl = AuthService().baseUrl;
 
       if (accessToken == null) {

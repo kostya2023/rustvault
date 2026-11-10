@@ -226,7 +226,10 @@ class _AuthScreenState extends State<AuthScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(username: accountInfo.username),
+            builder: (context) => HomeScreen(
+              username: accountInfo.username,
+              accessToken: tokens.$1,
+            ),
           ),
         );
       }
@@ -282,14 +285,20 @@ class _AuthScreenState extends State<AuthScreen> {
         baseUrl: baseUrl,
       );
 
+      // Шаг 1: Получаем flow
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
 
+      // Запрос TOTP кода у пользователя
       final totpCode = await _showTotpInputDialog(
         context,
         'Требуется подтверждение TOTP',
       );
-      if (totpCode == null || totpCode.isEmpty) return;
+      if (totpCode == null || totpCode.isEmpty) {
+        await cryptoKey.zeroize();
+        return;
+      }
 
+      // Шаг 2: Отправляем код подтверждения на сервер
       final tokens = await client.step2(flow: flow, totpCode: totpCode);
 
       final accountClient = await AccountClient.withBaseUrl(baseUrl: baseUrl);
@@ -310,6 +319,7 @@ class _AuthScreenState extends State<AuthScreen> {
             builder: (context) => HomeScreen(
               username: accountInfo.username,
               cryptoKey: cryptoKey,
+              accessToken: tokens.$1,
             ),
           ),
         );
@@ -336,13 +346,19 @@ class _AuthScreenState extends State<AuthScreen> {
         baseUrl: baseUrl,
       );
 
+      // Шаг 1 регистрации
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
 
       final String totpSettings = await flow.totpUrl();
 
+      // Настройка TOTP (сканирование QR-кода)
       final totpCode = await _showTotpSetupDialog(context, totpSettings);
-      if (totpCode == null || totpCode.isEmpty) return;
+      if (totpCode == null || totpCode.isEmpty) {
+        await cryptoKey.zeroize();
+        return;
+      }
 
+      // Шаг 2 регистрации с проверочным кодом
       final tokens = await client.step2(flow: flow, totpCode: totpCode);
 
       final accountClient = await AccountClient.withBaseUrl(baseUrl: baseUrl);
@@ -363,6 +379,7 @@ class _AuthScreenState extends State<AuthScreen> {
             builder: (context) => HomeScreen(
               username: accountInfo.username,
               cryptoKey: cryptoKey,
+              accessToken: tokens.$1,
             ),
           ),
         );
@@ -382,79 +399,107 @@ class _AuthScreenState extends State<AuthScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
+        return Dialog(
           backgroundColor: const Color(0xFF18181B),
-          title: const Text(
-            'Настройка двухфакторной аутентификации',
-            style: TextStyle(fontSize: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Отсканируйте этот QR-код в приложении аутентификации:',
-                  style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: QrImageView(
-                    data: totpUri,
-                    version: QrVersions.auto,
-                    size: 180.0,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: codeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 8,
-                  onSubmitted: (value) {
-                    final code = value.trim();
-                    if (code.length == 6 || code.length == 8) {
-                      Navigator.pop(context, code);
-                    }
-                  },
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration('Введите 6 или 8-значный код'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Отмена',
-                style: TextStyle(color: Color(0xFF71717A)),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFAFAFA),
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                final code = codeController.text.trim();
-                if (code.length == 6 || code.length == 8) {
-                  Navigator.pop(context, code);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚠️ Код должен содержать 6 или 8 символов'),
-                      backgroundColor: Color(0xFFEF4444),
+          child: SizedBox(
+            width: 360,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Настройка двухфакторной аутентификации',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  );
-                }
-              },
-              child: const Text('Подтвердить'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Отсканируйте этот QR-код в приложении аутентификации:',
+                      style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: QrImageView(
+                            data: totpUri,
+                            version: QrVersions.auto,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: codeController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      onSubmitted: (value) {
+                        final code = value.trim();
+                        if (code.length == 6 || code.length == 8) {
+                          Navigator.pop(context, code);
+                        }
+                      },
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecoration(
+                        'Введите 6 или 8-значный код',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            'Отмена',
+                            style: TextStyle(color: Color(0xFF71717A)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFAFAFA),
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () {
+                            final code = codeController.text.trim();
+                            if (code.length == 6 || code.length == 8) {
+                              Navigator.pop(context, code);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    '⚠️ Код должен содержать 6 или 8 символов',
+                                  ),
+                                  backgroundColor: Color(0xFFEF4444),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text('Подтвердить'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         );
       },
     );

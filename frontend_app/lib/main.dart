@@ -69,7 +69,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  String baseUrl = 'http://localhost:8080';
+  String baseUrl = 'http://localhost:80';
 
   @override
   void dispose() {
@@ -105,7 +105,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: urlController,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 decoration: _inputDecoration(
-                  'Base URL (например, http://192.168.1.15:8080)',
+                  'Base URL (например, http://192.168.1.15:80)',
                 ),
               ),
             ],
@@ -126,6 +126,7 @@ class _AuthScreenState extends State<AuthScreen> {
               onPressed: () {
                 setState(() {
                   baseUrl = urlController.text.trim();
+                  AuthService().baseUrl = baseUrl;
                 });
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(

@@ -11,7 +11,7 @@ class AuthService {
   String? _refreshToken;
   Timer? _refreshTimer;
 
-  String _baseUrl = 'http://localhost:8080';
+  String _baseUrl = 'http://localhost:80';
 
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;

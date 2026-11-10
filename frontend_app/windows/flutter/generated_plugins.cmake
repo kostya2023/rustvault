@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  url_launcher_windows
   webauthn_secure_storage_windows
 )
 

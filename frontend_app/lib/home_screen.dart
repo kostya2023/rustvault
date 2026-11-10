@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'account_management_dialog.dart';
+import 'widgets/operation_stopwatch.dart';
 import 'services/auth_service.dart';
 import 'main.dart';
 import 'rust/api/clients/vault_client.dart';
@@ -56,9 +60,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<PasswordItem> _passwords = [];
+  List<PasswordItem> _baseVaultPasswords = [];
   bool _isLoadingVault = true;
   bool _isSavingVault = false;
   bool _isSyncing = false;
+  bool _isBackgroundRefreshing = false;
+  String _activityStatus = 'Подготовка хранилища…';
+  int _saveCountdownSeconds = 0;
 
   /// Хранилище успешно скачано и расшифровано. Пока это false, сохранять
   /// нельзя — иначе можно затереть серверные данные пустым списком.
@@ -77,16 +85,26 @@ class _HomeScreenState extends State<HomeScreen> {
   // увеличивается строго последовательно.
   Future<void>? _saveChain;
   bool _saveQueued = false;
+  Timer? _saveDebounceTimer;
+  Timer? _backgroundSyncTimer;
+  bool _hasPendingSave = false;
+  int _changeRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _showPasswordList = [];
     _loadVaultFromBackend();
+    _backgroundSyncTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshVaultInBackground(),
+    );
   }
 
   @override
   void dispose() {
+    _saveDebounceTimer?.cancel();
+    _backgroundSyncTimer?.cancel();
     _scrollController.dispose();
     widget.cryptoKey?.zeroize();
     super.dispose();
@@ -185,6 +203,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// расшифровывает их текущим ключом и заменяет локальный список.
   Future<void> _syncVaultFromServer() async {
     if (_isSyncing) return;
+    if (_hasPendingSave) {
+      _showSnack(
+        'Сначала дождитесь отправки локальных изменений, чтобы не потерять их.',
+        isError: true,
+      );
+      return;
+    }
 
     if (widget.cryptoKey == null) {
       _showSnack(
@@ -204,6 +229,67 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _refreshVaultInBackground() async {
+    if (!mounted ||
+        !_vaultReady ||
+        _hasPendingSave ||
+        _isSavingVault ||
+        _isSyncing ||
+        _isBackgroundRefreshing ||
+        widget.cryptoKey == null ||
+        _resolveAccessToken() == null) {
+      return;
+    }
+
+    _isBackgroundRefreshing = true;
+    if (mounted) {
+      setState(() => _activityStatus = 'Фоновое обновление хранилища…');
+    }
+    try {
+      final vaultClient = await AuthService().createVaultClient();
+      final blob = await _withTokenRetry(
+        (accessToken) => vaultClient.download(accessToken: accessToken),
+      );
+      final metadata = await _withTokenRetry(
+        (accessToken) => vaultClient.getMetadata(accessToken: accessToken),
+      );
+      if (!mounted ||
+          _hasPendingSave ||
+          _isSavingVault ||
+          metadata.version <= _currentVaultVersion) {
+        return;
+      }
+
+      final cryptoClient = await CryptoClient.newInstance();
+      final keys = await cryptoClient.decryptKeys(
+        cryptoKey: widget.cryptoKey!,
+        blob: blob,
+      );
+      if (!mounted ||
+          _hasPendingSave ||
+          _isSavingVault ||
+          metadata.version <= _currentVaultVersion) {
+        return;
+      }
+
+      setState(() {
+        _passwords = keys.keys.map(PasswordItem.fromRustKey).toList();
+        _baseVaultPasswords = List.of(_passwords);
+        _currentVaultVersion = metadata.version;
+        _updatePasswordListState();
+        _activityStatus = 'Получены изменения с сервера';
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Ошибка фонового обновления хранилища: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _isBackgroundRefreshing = false;
+      if (mounted && !_isSavingVault && !_hasPendingSave) {
+        setState(() => _activityStatus = 'Хранилище готово');
+      }
+    }
+  }
+
   Future<bool> _fetchVault({
     required bool showFeedback,
     bool keepDataOnError = false,
@@ -217,14 +303,13 @@ class _HomeScreenState extends State<HomeScreen> {
           _vaultReady = false;
           _vaultError = _isDemoSession
               ? 'Демо-вход admin/admin: серверное хранилище недоступно. Войдите реальным аккаунтом.'
-              : 'Вход по Passkey: расшифровка хранилища пока недоступна. Войдите по паролю, чтобы увидеть пароли.';
+              : 'Ключ хранилища недоступен. Войдите по паролю или Passkey с паролем.';
+          _activityStatus = 'Хранилище недоступно';
         });
       }
       if (showFeedback) {
         _showSnack(
-          _isDemoSession
-              ? 'Демо-вход admin/admin не подключён к серверу.'
-              : 'Для просмотра хранилища нужен вход по паролю.',
+          _isDemoSession ? 'Демо-вход admin/admin не подключён к серверу.' : 'Для просмотра паролей нужен ключ хранилища. Войдите с паролем.',
           isError: true,
         );
       }
@@ -237,6 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoadingVault = false;
           _vaultReady = false;
           _vaultError = 'Сессия не найдена. Войдите в аккаунт заново.';
+          _activityStatus = 'Сессия не найдена';
         });
       }
       if (showFeedback) {
@@ -249,12 +335,12 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isLoadingVault = true;
         _vaultError = null;
+        _activityStatus = 'Загрузка хранилища…';
       });
     }
 
     try {
-      final baseUrl = AuthService().baseUrl;
-      final vaultClient = await VaultClient.withBaseUrl(baseUrl: baseUrl);
+      final vaultClient = await AuthService().createVaultClient();
       final cryptoClient = await CryptoClient.newInstance();
 
       // Получаем актуальную версию блоба на сервере.
@@ -275,10 +361,12 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _currentVaultVersion = 0;
           _passwords = [];
+          _baseVaultPasswords = [];
           _updatePasswordListState();
           _vaultReady = true;
           _vaultError = null;
           _isLoadingVault = false;
+          _activityStatus = 'Хранилище готово';
         });
         if (showFeedback) {
           _showSnack(
@@ -306,10 +394,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _passwords = keys.keys
             .map((key) => PasswordItem.fromRustKey(key))
             .toList();
+        _baseVaultPasswords = List.of(_passwords);
         _updatePasswordListState();
         _vaultReady = true;
         _vaultError = null;
         _isLoadingVault = false;
+        _activityStatus = 'Хранилище готово';
       });
 
       if (showFeedback) {
@@ -329,6 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _vaultReady = false;
         _vaultError = _describeError(error);
         _isLoadingVault = false;
+        _activityStatus = 'Ошибка загрузки хранилища';
         if (!keepDataOnError) {
           _passwords = [];
           _updatePasswordListState();
@@ -345,6 +436,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 📤 Шифрование и отправка хранилища на сервер.
   void _requestVaultSave() {
+    _hasPendingSave = true;
+    _saveDebounceTimer?.cancel();
+    _saveCountdownSeconds = 30;
+    if (mounted) {
+      setState(() {
+        _activityStatus = 'Синхронизация через 30 секунд';
+      });
+    }
+    _saveDebounceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _saveCountdownSeconds <= 1) {
+        timer.cancel();
+        _saveCountdownSeconds = 0;
+        _queueVaultSave();
+        return;
+      }
+      setState(() {
+        _saveCountdownSeconds--;
+        _activityStatus = 'Синхронизация через $_saveCountdownSeconds секунд';
+      });
+    });
+  }
+
+  void _queueVaultSave() {
+    _saveDebounceTimer?.cancel();
+    _saveCountdownSeconds = 0;
     if (_saveChain != null) {
       _saveQueued = true;
       return;
@@ -353,6 +469,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveChain = _runVaultSaveLoop().whenComplete(() {
       _saveChain = null;
     });
+  }
+
+  void _forceSaveNow() {
+    if (!_hasPendingSave || _isSavingVault) return;
+    _saveDebounceTimer?.cancel();
+    _saveCountdownSeconds = 0;
+    if (mounted) {
+      setState(() => _activityStatus = 'Запускаю синхронизацию…');
+    }
+    _queueVaultSave();
   }
 
   Future<void> _runVaultSaveLoop() async {
@@ -380,16 +506,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (mounted) {
-      setState(() => _isSavingVault = true);
+      setState(() {
+        _isSavingVault = true;
+        _activityStatus = 'Шифрование хранилища…';
+      });
     }
 
+    final revisionAtStart = _changeRevision;
     try {
-      final baseUrl = AuthService().baseUrl;
-      final vaultClient = await VaultClient.withBaseUrl(baseUrl: baseUrl);
+      final vaultClient = await AuthService().createVaultClient();
       final cryptoClient = await CryptoClient.newInstance();
+      final localPasswords = List<PasswordItem>.of(_passwords);
 
       final rust_crypto.Keys keys = rust_crypto.Keys(
-        keys: _passwords.map((item) => item.toRustKey()).toList(),
+        keys: localPasswords.map((item) => item.toRustKey()).toList(),
       );
 
       // encryptKeys сам формирует соль/нонс и тег внутри Rust.
@@ -399,10 +529,29 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       // Сервер требует версию строго больше сохранённой.
-      final savedVersion = await _uploadVaultWithRetry(vaultClient, newBlob);
+      if (mounted) {
+        setState(() => _activityStatus = 'Синхронизация с сервером…');
+      }
+      final (savedVersion, mergedPasswords) = await _uploadVaultWithRetry(
+        vaultClient,
+        cryptoClient,
+        localPasswords,
+        newBlob,
+      );
       _currentVaultVersion = savedVersion;
+      _baseVaultPasswords = List.of(mergedPasswords);
+      if (revisionAtStart == _changeRevision) {
+        if (mounted) {
+          setState(() {
+            _passwords = List.of(mergedPasswords);
+            _updatePasswordListState();
+          });
+        }
+        _hasPendingSave = false;
+      }
 
       if (mounted) {
+        setState(() => _activityStatus = 'Хранилище готово');
         _showSnack(
           'Сохранено на сервере (версия $savedVersion).',
           isError: false,
@@ -413,8 +562,15 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
+        setState(
+          () => _activityStatus = error is StateError
+              ? 'Слияние версий не выполнено'
+              : 'Ошибка синхронизации',
+        );
         _showSnack(
-          'Не удалось сохранить: ${_describeError(error)}',
+          error is StateError
+              ? 'Не удалось объединить версии: ${_describeError(error)}'
+              : 'Не удалось сохранить: ${_describeError(error)}',
           isError: true,
         );
       }
@@ -425,7 +581,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<int> _uploadVaultWithRetry(VaultClient vaultClient, Blob blob) async {
+  Future<(int, List<PasswordItem>)> _uploadVaultWithRetry(
+    VaultClient vaultClient,
+    CryptoClient cryptoClient,
+    List<PasswordItem> pendingPasswords,
+    Blob blob,
+  ) async {
     var version = _currentVaultVersion + 1;
     try {
       await _withTokenRetry(
@@ -435,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> {
           version: version,
         ),
       );
-      return version;
+      return (version, pendingPasswords);
     } on SdkError catch (error) {
       final staleVersion =
           error is SdkError_Server &&
@@ -443,10 +604,41 @@ class _HomeScreenState extends State<HomeScreen> {
               error.code == 'BLOB_VERSION_INVALID');
       if (!staleVersion) rethrow;
 
-      // Другое устройство уже сохранило более новую версию: подтягиваем
-      // серверную версию и повторяем загрузку с версией +1.
+      if (mounted) {
+        setState(() => _activityStatus = 'Проверка и объединение версий…');
+      }
       final metadata = await _withTokenRetry(
         (accessToken) => vaultClient.getMetadata(accessToken: accessToken),
+      );
+      final serverBlob = await _withTokenRetry(
+        (accessToken) => vaultClient.download(accessToken: accessToken),
+      );
+      final serverKeys = await cryptoClient.decryptKeys(
+        cryptoKey: widget.cryptoKey!,
+        blob: serverBlob,
+      );
+      final mergedPasswords = await _mergeVaultPasswords(
+        pendingPasswords,
+        serverKeys.keys.map(PasswordItem.fromRustKey).toList(),
+      );
+      if (mergedPasswords == null) {
+        throw StateError(
+          'Слияние отменено: выберите версию и повторите сохранение.',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _passwords = mergedPasswords;
+          _updatePasswordListState();
+          _activityStatus = 'Шифрование объединённого хранилища…';
+        });
+      }
+      final mergedBlob = await cryptoClient.encryptKeys(
+        cryptoKey: widget.cryptoKey!,
+        keys: rust_crypto.Keys(
+          keys: mergedPasswords.map((item) => item.toRustKey()).toList(),
+        ),
       );
       _currentVaultVersion = metadata.version;
       version = metadata.version + 1;
@@ -454,15 +646,203 @@ class _HomeScreenState extends State<HomeScreen> {
       await _withTokenRetry(
         (accessToken) => vaultClient.upload(
           accessToken: accessToken,
-          blob: blob,
+          blob: mergedBlob,
           version: version,
         ),
       );
-      return version;
+      return (version, mergedPasswords);
     }
   }
 
+  Future<List<PasswordItem>?> _mergeVaultPasswords(
+    List<PasswordItem> localPasswords,
+    List<PasswordItem> serverPasswords,
+  ) async {
+    String identity(PasswordItem item) =>
+        '${item.title.trim().toLowerCase()}\u0000${item.login.trim().toLowerCase()}';
+    bool sameEntry(PasswordItem first, PasswordItem second) =>
+        first.title == second.title &&
+        first.login == second.login &&
+        first.password == second.password &&
+        first.userComment == second.userComment;
+
+    final baseByIdentity = <String, PasswordItem>{
+      for (final item in _baseVaultPasswords) identity(item): item,
+    };
+    final localByIdentity = <String, PasswordItem>{
+      for (final item in localPasswords) identity(item): item,
+    };
+    final serverByIdentity = <String, PasswordItem>{
+      for (final item in serverPasswords) identity(item): item,
+    };
+    final mergedByIdentity = <String, PasswordItem>{};
+    final conflicts = <String, ({PasswordItem? local, PasswordItem? server})>{};
+
+    for (final key in {
+      ...baseByIdentity.keys,
+      ...localByIdentity.keys,
+      ...serverByIdentity.keys,
+    }) {
+      final base = baseByIdentity[key];
+      final local = localByIdentity[key];
+      final server = serverByIdentity[key];
+      if (base == null) {
+        if (local != null && server != null && !sameEntry(local, server)) {
+          conflicts[key] = (local: local, server: server);
+        } else if (local != null || server != null) {
+          mergedByIdentity[key] = local ?? server!;
+        }
+        continue;
+      }
+
+      final localChanged = local == null || !sameEntry(local, base);
+      final serverChanged = server == null || !sameEntry(server, base);
+      if (localChanged && serverChanged) {
+        if (local == null && server == null) continue;
+        if (local != null && server != null && sameEntry(local, server)) {
+          mergedByIdentity[key] = local;
+        } else {
+          conflicts[key] = (local: local, server: server);
+        }
+      } else if (localChanged) {
+        if (local != null) mergedByIdentity[key] = local;
+      } else if (server != null) {
+        mergedByIdentity[key] = server;
+      }
+    }
+
+    if (conflicts.isEmpty) return mergedByIdentity.values.toList();
+    final choices = await _showVaultMergeDialog(conflicts);
+    if (choices == null) return null;
+
+    for (final entry in conflicts.entries) {
+      final chosen = choices[entry.key] == true
+          ? entry.value.local
+          : entry.value.server;
+      if (chosen == null) {
+        mergedByIdentity.remove(entry.key);
+      } else {
+        mergedByIdentity[entry.key] = chosen;
+      }
+    }
+    return mergedByIdentity.values.toList();
+  }
+
+  Future<Map<String, bool>?> _showVaultMergeDialog(
+    Map<String, ({PasswordItem? local, PasswordItem? server})> conflicts,
+  ) {
+    final choices = <String, bool>{for (final key in conflicts.keys) key: true};
+    return showDialog<Map<String, bool>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF18181B),
+          title: const Text('Выберите записи для конфликтов'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Другие изменения объединены автоматически. Для одинаковых записей выберите, оставить локальную или серверную версию.',
+                    style: TextStyle(color: Color(0xFFA1A1AA)),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final entry in conflicts.entries)
+                    Card(
+                      color: const Color(0xFF202027),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (entry.value.local ?? entry.value.server!).title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              (entry.value.local ?? entry.value.server!).login,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 12,
+                              ),
+                            ),
+                            RadioGroup<bool>(
+                              groupValue: choices[entry.key],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setDialogState(
+                                    () => choices[entry.key] = value,
+                                  );
+                                }
+                              },
+                              child: Column(
+                                children: [
+                                  RadioListTile<bool>(
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                    value: true,
+                                    title: Text(
+                                      entry.value.local == null
+                                          ? 'Удалить запись локально'
+                                          : 'Оставить локальную версию',
+                                    ),
+                                  ),
+                                  RadioListTile<bool>(
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                    value: false,
+                                    title: Text(
+                                      entry.value.server == null
+                                          ? 'Удалить запись с сервера'
+                                          : 'Оставить версию с сервера',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, choices),
+              child: const Text('Объединить и сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleLogout() async {
+    _saveDebounceTimer?.cancel();
+    if (_hasPendingSave) {
+      _queueVaultSave();
+      final pendingSave = _saveChain;
+      if (pendingSave != null) await pendingSave;
+      if (_hasPendingSave) {
+        _showSnack(
+          'Выход отменён: изменения не удалось синхронизировать. Проверьте соединение и повторите.',
+          isError: true,
+        );
+        return;
+      }
+    }
+
     setState(() {
       _isLoggingOut = true;
     });
@@ -574,6 +954,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         userComment: commentController.text.trim(),
                       ),
                     );
+                    _changeRevision++;
                     _updatePasswordListState();
                   });
                   Navigator.pop(dialogContext);
@@ -662,6 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     password: passwordController.text,
                     userComment: commentController.text.trim(),
                   );
+                  _changeRevision++;
                 });
                 Navigator.pop(dialogContext);
                 _requestVaultSave();
@@ -671,6 +1053,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showAccountManagementDialog() {
+    final accessToken = _resolveAccessToken();
+    if (accessToken == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AccountManagementDialog(
+        username: widget.username,
+        accessToken: accessToken,
+        cryptoKey: widget.cryptoKey,
+        onAccountDeleted: () {
+          Navigator.pushAndRemoveUntil(
+            this.context,
+            MaterialPageRoute(builder: (context) => const AuthScreen()),
+            (route) => false,
+          );
+        },
+      ),
     );
   }
 
@@ -704,11 +1106,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Сохранено паролей:',
                 '${_passwords.length} шт.',
               ),
-              const SizedBox(height: 12),
-              _buildProfileInfoRow(
-                'Статус защиты:',
-                '🔒 Защищено Zero-Knowledge',
-              ),
+              if (_resolveAccessToken() != null) ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _showAccountManagementDialog();
+                    },
+                    icon: const Icon(Icons.manage_accounts, size: 17),
+                    label: const Text('Passkeys, события и аккаунт'),
+                  ),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -741,18 +1152,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProfileInfoRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+          ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Color(0xFFFAFAFA),
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFFAFAFA),
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -801,6 +1217,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _passwords.removeAt(index);
+      _changeRevision++;
       _updatePasswordListState();
     });
     _requestVaultSave();
@@ -994,6 +1411,119 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111827),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _activityStatus.startsWith('Ошибка')
+                              ? const Color(0xFF7F1D1D)
+                              : const Color(0xFF1E3A5F),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              if (_isLoadingVault ||
+                                  _isSavingVault ||
+                                  _isSyncing)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  _activityStatus.startsWith('Ошибка')
+                                      ? Icons.error_outline
+                                      : Icons.cloud_done_outlined,
+                                  size: 18,
+                                  color: _activityStatus.startsWith('Ошибка')
+                                      ? const Color(0xFFF87171)
+                                      : const Color(0xFF60A5FA),
+                                ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _activityStatus,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFCBD5E1),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              if (_isLoadingVault ||
+                                  _isSavingVault ||
+                                  _isSyncing ||
+                                  _isBackgroundRefreshing) ...[
+                                const SizedBox(width: 8),
+                                const OperationStopwatch(running: true),
+                              ],
+                              if (_hasPendingSave)
+                                TextButton(
+                                  onPressed: _isSavingVault
+                                      ? null
+                                      : _forceSaveNow,
+                                  child: const Text(
+                                    'Синхронизировать сейчас',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                )
+                              else if (_activityStatus.startsWith('Ошибка'))
+                                IconButton(
+                                  tooltip: 'Повторить синхронизацию',
+                                  onPressed: _isSavingVault
+                                      ? null
+                                      : _queueVaultSave,
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                ),
+                            ],
+                          ),
+                          if (_saveCountdownSeconds > 0) ...[
+                            const SizedBox(height: 8),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 0,
+                                end: 1 - _saveCountdownSeconds / 30,
+                              ),
+                              duration: const Duration(seconds: 1),
+                              curve: Curves.easeInOut,
+                              builder: (context, progress, child) =>
+                                  LinearProgressIndicator(
+                                    value: progress,
+                                    minHeight: 5,
+                                    backgroundColor: const Color(0xFF1E293B),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                      Color(0xFF60A5FA),
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Осталось $_saveCountdownSeconds сек.',
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         const Text(

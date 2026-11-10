@@ -1,14 +1,21 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webauthn_secure_storage/webauthn_secure_storage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'services/auth_service.dart';
+import 'services/webauthn_options.dart';
+import 'services/passkey_executor.dart';
+import 'services/totp_code.dart';
+import 'widgets/operation_stopwatch.dart';
 import 'rust/frb_generated.dart';
 import 'rust/api/clients/auth_client.dart';
-import 'rust/api/clients/account_client.dart';
 import 'rust/api/types/master_key.dart';
 import 'rust/api/types/security.dart';
 
@@ -68,8 +75,13 @@ class _AuthScreenState extends State<AuthScreen> {
 
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  String _authStatus = '';
 
-  String baseUrl = 'http://localhost:80';
+  late String baseUrl = AuthService().baseUrl;
+
+  void _setAuthStatus(String status) {
+    if (mounted) setState(() => _authStatus = status);
+  }
 
   @override
   void dispose() {
@@ -83,65 +95,129 @@ class _AuthScreenState extends State<AuthScreen> {
     final TextEditingController urlController = TextEditingController(
       text: baseUrl,
     );
+    Uint8List? selectedCert = AuthService().sslCaPinnedCert;
+    String? selectedCertPath = AuthService().sslCaPinnedCertPath;
 
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF18181B),
-          title: const Text(
-            '⚙️ Настройка Debug Server',
-            style: TextStyle(fontSize: 16),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Введите актуальный IP и порт бэкенда для локальной сети:',
-                style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: urlController,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: _inputDecoration(
-                  'Base URL (например, http://192.168.1.15:80)',
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: const Color(0xFF18181B),
+            title: const Text(
+              '⚙️ Настройка Debug Server',
+              style: TextStyle(fontSize: 16),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Укажите адрес API и при необходимости выберите CA-сертификат для всех запросов.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: _inputDecoration(
+                    'Base URL (например, https://vault.example:8443)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: const ['pem', 'crt', 'cer', 'der'],
+                        withData: true,
+                      );
+                      if (result == null) return;
+                      final file = result.files.single;
+                      final bytes = file.bytes;
+                      if (bytes == null || bytes.isEmpty) {
+                        throw StateError(
+                          'Файл сертификата пуст или недоступен.',
+                        );
+                      }
+                      setDialogState(() {
+                        selectedCert = bytes;
+                        selectedCertPath = file.name;
+                      });
+                    } catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Не удалось прочитать CA: $error'),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.upload_file, size: 18),
+                  label: Text(
+                    selectedCertPath == null
+                        ? 'Выбрать SSL CA pinned cert'
+                        : 'Сертификат: $selectedCertPath',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (selectedCert != null)
+                  TextButton(
+                    onPressed: () => setDialogState(() {
+                      selectedCert = null;
+                      selectedCertPath = null;
+                    }),
+                    child: const Text('Убрать CA-сертификат'),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Отмена',
+                  style: TextStyle(color: Color(0xFF71717A)),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFAFAFA),
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: () {
+                  final url = urlController.text.trim();
+                  final parsedUrl = Uri.tryParse(url);
+                  if (parsedUrl == null ||
+                      !parsedUrl.hasAuthority ||
+                      !const ['http', 'https'].contains(parsedUrl.scheme)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Введите корректный HTTP(S) Base URL.'),
+                      ),
+                    );
+                    return;
+                  }
+                  setState(() => baseUrl = url);
+                  AuthService()
+                    ..baseUrl = url
+                    ..setSslCaPinnedCert(selectedCert, path: selectedCertPath);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Debug API настроен: $url'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                },
+                child: const Text('Сохранить'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Отмена',
-                style: TextStyle(color: Color(0xFF71717A)),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFAFAFA),
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                setState(() {
-                  baseUrl = urlController.text.trim();
-                  AuthService().baseUrl = baseUrl;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('⚠️ Base URL изменен на: $baseUrl'),
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                );
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
         );
       },
     );
+    urlController.dispose();
   }
 
   Future<void> _submitForm() async {
@@ -149,6 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
     setState(() {
       _isLoading = true;
+      _authStatus = isLogin ? 'Подготовка входа…' : 'Подготовка регистрации…';
     });
 
     try {
@@ -158,6 +235,7 @@ class _AuthScreenState extends State<AuthScreen> {
         await _registerToServer();
       }
     } catch (e) {
+      _setAuthStatus('Операция завершилась с ошибкой');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -170,6 +248,9 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          if (_authStatus != 'Операция завершилась с ошибкой') {
+            _authStatus = '';
+          }
         });
       }
     }
@@ -178,10 +259,11 @@ class _AuthScreenState extends State<AuthScreen> {
   // 🔑 Вход по Passkey через LoginWithPasskeyClient
   Future<void> _loginWithPasskey() async {
     final username = _loginController.text.trim();
-    if (username.isEmpty) {
+    final password = _passwordController.text;
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Сначала введите логин для входа по Passkey'),
+          content: Text('Для входа по Passkey введите логин и пароль.'),
           backgroundColor: Color(0xFFEF4444),
         ),
       );
@@ -190,34 +272,49 @@ class _AuthScreenState extends State<AuthScreen> {
 
     setState(() {
       _isLoading = true;
+      _authStatus = 'Деривация CryptoKey…';
     });
 
+    CryptoKey? cryptoKey;
     try {
-      final client = await LoginWithPasskeyClient.withBaseUrl(baseUrl: baseUrl);
-      final PasskeyChallenge challenge = await client.step1(username: username);
-
-      final requestOptions = PublicKeyCredentialRequestOptionsJson.fromJson(
-        jsonDecode(challenge.passkeyPropsJson),
+      final userPassword = await UserPassword.newInstance(password: password);
+      cryptoKey = await CryptoKey.fromUserPassword(
+        userPassword: userPassword,
+        username: username,
       );
 
-      final biometricStorage = BiometricStorage();
-      final assertion = await biometricStorage.authenticateWithPasskey(
+      AuthService().baseUrl = baseUrl;
+      _setAuthStatus('Получение challenge Passkey…');
+      final client = await LoginWithPasskeyClient.withBaseUrlAndRootOfTrust(
+        baseUrl: baseUrl,
+        sslCaPinnedCert: AuthService().sslCaPinnedCert,
+      );
+      final PasskeyChallenge challenge = await client.step1(username: username);
+
+      _setAuthStatus('Ожидание подтверждения Passkey…');
+      final requestOptions = PublicKeyCredentialRequestOptionsJson.fromJson(
+        parseWebAuthnPublicKeyOptions(challenge.passkeyPropsJson),
+      );
+
+      final assertion = await authenticatePasskeyWithoutBlockingUi(
         requestOptions,
       );
 
       final String passkeyResultJson = jsonEncode(assertion.toJson());
 
+      _setAuthStatus('Проверка Passkey и загрузка профиля…');
       final tokens = await client.step2(
         operationId: challenge.operationId,
         passkeyAssertionJson: passkeyResultJson,
       );
 
-      final accountClient = await AccountClient.withBaseUrl(baseUrl: baseUrl);
+      final accountClient = await AuthService().createAccountClient();
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
       AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
 
       if (mounted) {
+        final CryptoKey vaultCryptoKey = cryptoKey;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🎉 Успешный вход по Passkey!'),
@@ -229,12 +326,18 @@ class _AuthScreenState extends State<AuthScreen> {
           MaterialPageRoute(
             builder: (context) => HomeScreen(
               username: accountInfo.username,
+              cryptoKey: vaultCryptoKey,
               accessToken: tokens.$1,
             ),
           ),
         );
+        cryptoKey = null;
+      } else {
+        await cryptoKey.zeroize();
+        cryptoKey = null;
       }
     } catch (e) {
+      _setAuthStatus('Вход по Passkey не выполнен');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -244,9 +347,13 @@ class _AuthScreenState extends State<AuthScreen> {
         );
       }
     } finally {
+      if (cryptoKey != null) await cryptoKey.zeroize();
       if (mounted) {
         setState(() {
           _isLoading = false;
+          if (_authStatus != 'Операция завершилась с ошибкой') {
+            _authStatus = '';
+          }
         });
       }
     }
@@ -275,6 +382,7 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    _setAuthStatus('Деривация CryptoKey…');
     final userPassword = await UserPassword.newInstance(password: password);
     final cryptoKey = await CryptoKey.fromUserPassword(
       userPassword: userPassword,
@@ -282,14 +390,22 @@ class _AuthScreenState extends State<AuthScreen> {
     );
 
     try {
-      final client = await LoginWithPasstotpClient.withBaseUrl(
+      _setAuthStatus('Проверка учётных данных…');
+      AuthService().baseUrl = baseUrl;
+      final client = await LoginWithPasstotpClient.withBaseUrlAndRootOfTrust(
         baseUrl: baseUrl,
+        sslCaPinnedCert: AuthService().sslCaPinnedCert,
       );
 
       // Шаг 1: Получаем flow
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
+      if (!mounted) {
+        await cryptoKey.zeroize();
+        return;
+      }
 
       // Запрос TOTP кода у пользователя
+      _setAuthStatus('Ожидание подтверждения TOTP…');
       final totpCode = await _showTotpInputDialog(
         context,
         'Требуется подтверждение TOTP',
@@ -302,7 +418,8 @@ class _AuthScreenState extends State<AuthScreen> {
       // Шаг 2: Отправляем код подтверждения на сервер
       final tokens = await client.step2(flow: flow, totpCode: totpCode);
 
-      final accountClient = await AccountClient.withBaseUrl(baseUrl: baseUrl);
+      _setAuthStatus('Загрузка профиля аккаунта…');
+      final accountClient = await AuthService().createAccountClient();
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
       AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
@@ -336,6 +453,7 @@ class _AuthScreenState extends State<AuthScreen> {
     final username = _loginController.text.trim();
     final password = _passwordController.text;
 
+    _setAuthStatus('Деривация CryptoKey…');
     final userPassword = await UserPassword.newInstance(password: password);
     final cryptoKey = await CryptoKey.fromUserPassword(
       userPassword: userPassword,
@@ -343,16 +461,25 @@ class _AuthScreenState extends State<AuthScreen> {
     );
 
     try {
-      final client = await RegistrationWithPasstotpClient.withBaseUrl(
-        baseUrl: baseUrl,
-      );
+      AuthService().baseUrl = baseUrl;
+      _setAuthStatus('Создание учётной записи…');
+      final client =
+          await RegistrationWithPasstotpClient.withBaseUrlAndRootOfTrust(
+            baseUrl: baseUrl,
+            sslCaPinnedCert: AuthService().sslCaPinnedCert,
+          );
 
       // Шаг 1 регистрации
       final flow = await client.step1(username: username, cryptoKey: cryptoKey);
 
       final String totpSettings = await flow.totpUrl();
+      if (!mounted) {
+        await cryptoKey.zeroize();
+        return;
+      }
 
       // Настройка TOTP (сканирование QR-кода)
+      _setAuthStatus('Ожидание настройки TOTP…');
       final totpCode = await _showTotpSetupDialog(context, totpSettings);
       if (totpCode == null || totpCode.isEmpty) {
         await cryptoKey.zeroize();
@@ -362,7 +489,8 @@ class _AuthScreenState extends State<AuthScreen> {
       // Шаг 2 регистрации с проверочным кодом
       final tokens = await client.step2(flow: flow, totpCode: totpCode);
 
-      final accountClient = await AccountClient.withBaseUrl(baseUrl: baseUrl);
+      _setAuthStatus('Загрузка профиля аккаунта…');
+      final accountClient = await AuthService().createAccountClient();
       final accountInfo = await accountClient.getInfo(accessToken: tokens.$1);
 
       AuthService().saveTokens(tokens.$1, tokens.$2, currentBaseUrl: baseUrl);
@@ -396,6 +524,39 @@ class _AuthScreenState extends State<AuthScreen> {
     String totpUri,
   ) async {
     final TextEditingController codeController = TextEditingController();
+
+    Future<void> openTotpLink() async {
+      final uri = Uri.tryParse(totpUri);
+      if (uri == null || uri.scheme != 'otpauth') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ссылка настройки TOTP некорректна.')),
+        );
+        return;
+      }
+
+      try {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Не удалось открыть ссылку. Скопируйте otpauth:// URI из QR-кода или отсканируйте его.',
+              ),
+            ),
+          );
+        }
+      } catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Не удалось открыть ссылку TOTP: $error')),
+          );
+        }
+      }
+    }
+
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -444,20 +605,35 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton(
+                        onPressed: openTotpLink,
+                        child: const Text(
+                          'Если не можете отсканировать, нажмите здесь',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF60A5FA),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: codeController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       maxLength: 8,
                       onSubmitted: (value) {
                         final code = value.trim();
-                        if (code.length == 6 || code.length == 8) {
+                        if (isValidTotpCode(code)) {
                           Navigator.pop(context, code);
                         }
                       },
                       style: const TextStyle(color: Colors.white),
                       decoration: _inputDecoration(
-                        'Введите 6 или 8-значный код',
+                        'Введите 8-значный код TOTP',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -479,13 +655,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           onPressed: () {
                             final code = codeController.text.trim();
-                            if (code.length == 6 || code.length == 8) {
+                            if (isValidTotpCode(code)) {
                               Navigator.pop(context, code);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    '⚠️ Код должен содержать 6 или 8 символов',
+                                    '⚠️ Код TOTP должен содержать ровно 8 цифр',
                                   ),
                                   backgroundColor: Color(0xFFEF4444),
                                 ),
@@ -521,16 +697,17 @@ class _AuthScreenState extends State<AuthScreen> {
           content: TextField(
             controller: codeController,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             maxLength: 8,
             autofocus: true,
             onSubmitted: (value) {
               final code = value.trim();
-              if (code.length == 6 || code.length == 8) {
+              if (isValidTotpCode(code)) {
                 Navigator.pop(context, code);
               }
             },
             style: const TextStyle(color: Colors.white),
-            decoration: _inputDecoration('Введите 6 или 8-значный код'),
+            decoration: _inputDecoration('Введите 8-значный код TOTP'),
           ),
           actions: [
             TextButton(
@@ -547,12 +724,14 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               onPressed: () {
                 final code = codeController.text.trim();
-                if (code.length == 6 || code.length == 8) {
+                if (isValidTotpCode(code)) {
                   Navigator.pop(context, code);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('⚠️ Код должен содержать 6 или 8 символов'),
+                      content: Text(
+                        '⚠️ Код TOTP должен содержать ровно 8 цифр',
+                      ),
                       backgroundColor: Color(0xFFEF4444),
                     ),
                   );
@@ -623,37 +802,6 @@ class _AuthScreenState extends State<AuthScreen> {
                         },
                       ),
                       const SizedBox(height: 14),
-                      if (isLogin) ...[
-                        OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _loginWithPasskey,
-                          icon: const Icon(
-                            Icons.fingerprint,
-                            size: 18,
-                            color: Color(0xFF3B82F6),
-                          ),
-                          label: const Text('Войти по Passkey'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFFAFAFA),
-                            side: const BorderSide(color: Color(0xFF3B82F6)),
-                            backgroundColor: const Color(0xFF18181B),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        const Center(
-                          child: Text(
-                            'или с паролем',
-                            style: TextStyle(
-                              color: Color(0xFF71717A),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
                       TextFormField(
                         controller: _passwordController,
                         obscureText: true,
@@ -728,6 +876,79 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                               ),
                       ),
+                      if (isLogin) ...[
+                        const SizedBox(height: 14),
+                        const Center(
+                          child: Text(
+                            'или войдите по Passkey (пароль тоже обязателен)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF71717A),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  if (_formKey.currentState!.validate()) {
+                                    unawaited(_loginWithPasskey());
+                                  }
+                                },
+                          icon: const Icon(
+                            Icons.fingerprint,
+                            size: 18,
+                            color: Color(0xFF3B82F6),
+                          ),
+                          label: const Text('Войти по Passkey'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFAFAFA),
+                            side: const BorderSide(color: Color(0xFF3B82F6)),
+                            backgroundColor: const Color(0xFF18181B),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_isLoading && _authStatus.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF18181B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF27272A)),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF60A5FA),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _authStatus,
+                                  style: const TextStyle(
+                                    color: Color(0xFFCBD5E1),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const OperationStopwatch(running: true),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
